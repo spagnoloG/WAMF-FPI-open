@@ -88,7 +88,7 @@ class DataModule(pl.LightningDataModule):
             uav_scales=self.uav_scales,
             transform_mean=self.transform_mean,
             transform_std=self.transform_std,
-            dataset="val",
+            dataset="test",
         )
 
     def train_dataloader(self) -> DataLoader:

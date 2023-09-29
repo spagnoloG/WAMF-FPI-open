@@ -83,7 +83,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         and satellite images, along with their associated heatmap and metadata.
         """
 
-        image_path = self.image_paths[idx // len(self.uav_scales)]
+        image_path = self.entry_paths[idx // len(self.uav_scales)]
         uav_image = Image.open(image_path).convert("RGB")  # Ensure 3-channel image
 
         lookup_str, file_number = self.extract_info_from_filename(image_path)
@@ -102,7 +102,9 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             x_offset,
             y_offset,
             zoom_level,
-        ) = self.get_random_tiff_patch(lat, lon, self.sat_patch_h, self.sat_patch_w)
+        ) = self.get_random_tiff_patch(
+            lat, lon, 400, 400
+        )  # TODO: make patch size a parameter
 
         uav_image_scale = self.uav_scales[(idx % len(self.uav_scales))]
 
@@ -111,7 +113,9 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         w = np.ceil(uav_image.width // uav_image_scale).astype(int)
 
         uav_image = F.resize(uav_image, [h, w])
-        uav_image = F.center_crop(uav_image, (self.patch_h, self.patch_w))
+        uav_image = F.center_crop(
+            uav_image, (self.uav_patch_height, self.uav_patch_width)
+        )
         uav_image = self.transforms(uav_image)
 
         satellite_patch = satellite_patch.transpose(1, 2, 0)
@@ -482,11 +486,18 @@ def test():
     import matplotlib.pyplot as plt
 
     ## Plot the satellite patch and the point on the satellite patch
-    fig, axs = plt.subplots(1, 1, figsize=(20, 6))
-    axs.imshow(sat_patch.transpose(1, 2, 0))
-    axs.scatter(x_sat, y_sat, c="r")
-    axs.set_title("Satellite patch")
-    plt.savefig("output.png")
+    # fig, axs = plt.subplots(1, 1, figsize=(20, 6))
+    # axs.imshow(sat_patch.transpose(1, 2, 0))
+    # axs.scatter(x_sat, y_sat, c="r")
+    # axs.set_title("Satellite patch")
+    # plt.savefig("output.png")
+
+    for i, (uav_image, img_info, satellite_patch, heatmap) in enumerate(dataloader):
+        print(i)
+        print(uav_image.shape)
+        print(img_info)
+        print(satellite_patch.shape)
+        print(heatmap.shape)
 
 
 if __name__ == "__main__":
