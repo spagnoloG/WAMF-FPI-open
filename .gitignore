@@ -1,0 +1,4 @@
+.venv/**
+lightning_logs/**
+drone_dataset/**
+satellite_dataset/**
