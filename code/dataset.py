@@ -322,50 +322,27 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         neighbors.append(tile)
 
         for neighbor in neighbors:
-            found = False
             west, south, east, north = mercantile.bounds(neighbor)
             tile_path = f"{self.satellite_dataset_dir}/{neighbor.z}_{neighbor.x}_{neighbor.y}.jpg"
-            if os.path.exists(tile_path):
-                found = True
-                with Image.open(tile_path) as img:
-                    width, height = img.size
-
-                memfile = MemoryFile()
-                with memfile.open(
-                    driver="GTiff",
-                    height=height,
-                    width=width,
-                    count=3,
-                    dtype="uint8",
-                    crs="EPSG:3857",
-                    transform=from_bounds(west, south, east, north, width, height),
-                ) as dataset:
-                    data = rasterio.open(tile_path).read()
-                    dataset.write(data)
-                tile_data.append(memfile.open())
-
-                del memfile
-
-            if not found:
+            if not os.path.exists(tile_path):
                 self.download_missing_tile(neighbor)
-                time.sleep(1)
-                tile_path = f"{self.satellite_dataset_dir}/{neighbor.z}_{neighbor.x}_{neighbor.y}.jpg"
-                with Image.open(tile_path) as img:
-                    width, height = img.size
-                memfile = MemoryFile()
-                with memfile.open(
-                    driver="GTiff",
-                    height=height,
-                    width=width,
-                    count=3,
-                    dtype="uint8",
-                    crs="EPSG:3857",
-                    transform=from_bounds(west, south, east, north, width, height),
-                ) as dataset:
-                    data = rasterio.open(tile_path).read()
-                    dataset.write(data)
-                tile_data.append(memfile.open())
-                del memfile
+
+            with Image.open(tile_path) as img:
+                width, height = img.size
+            memfile = MemoryFile()
+            with memfile.open(
+                driver="GTiff",
+                height=height,
+                width=width,
+                count=3,
+                dtype="uint8",
+                crs="EPSG:3857",
+                transform=from_bounds(west, south, east, north, width, height),
+            ) as dataset:
+                data = rasterio.open(tile_path).read()
+                dataset.write(data)
+            tile_data.append(memfile.open())
+            memfile.close()
 
         mosaic, out_trans = merge(tile_data)
 
@@ -466,7 +443,7 @@ def test():
     )
 
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=1, shuffle=True, num_workers=1
+        dataset, batch_size=16, shuffle=True, num_workers=1
     )
 
     (
@@ -493,11 +470,7 @@ def test():
     # plt.savefig("output.png")
 
     for i, (uav_image, img_info, satellite_patch, heatmap) in enumerate(dataloader):
-        print(i)
-        print(uav_image.shape)
-        print(img_info)
-        print(satellite_patch.shape)
-        print(heatmap.shape)
+        pass
 
 
 if __name__ == "__main__":
