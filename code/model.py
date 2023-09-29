@@ -7,6 +7,10 @@ import torch.nn as nn
 import timm
 import torch
 import torch.nn.functional as F
+from torch.optim import AdamW
+from torch.optim.lr_scheduler import MultiStepLR
+from criterion import HanningLoss
+import pytorch_lightning as pl
 
 
 class Xcorr(nn.Module):
@@ -342,7 +346,7 @@ class ModifiedPCPVT(nn.Module):
         ]
 
 
-class CrossViewLocalizationModel(nn.Module):
+class CrossViewLocalizationModel(pl.LightningModule):
     """
     Cross-View Localization model that uses a satellite and UAV (Unmanned Aerial Vehicle)
     view for localization.
@@ -359,11 +363,20 @@ class CrossViewLocalizationModel(nn.Module):
         drops_satellite: dict,
         fusion_dropout: float,
         pretrained_twins: bool = True,
+        lr_backbone: float = 1e-4,
+        lr_fusion: float = 1e-4,
+        milestones: list = [2, 4, 6, 8],
+        gamma: float = 0.1,
     ) -> None:
         super(CrossViewLocalizationModel, self).__init__()
 
         self.satellite_resolution = satellite_resolution
         self.fusion_dropout = fusion_dropout
+        self.lr_backbone = lr_backbone
+        self.lr_fusion = lr_fusion
+        self.gamma = gamma
+        self.criterion = HanningLoss()
+        self.milestones = milestones
 
         if pretrained_twins is None:
             pretrained_twins = True
@@ -398,3 +411,38 @@ class CrossViewLocalizationModel(nn.Module):
         fused_map = fus.squeeze(1)  # remove the unnecessary channel dimension
 
         return fused_map
+
+    def configure_optimizers(self):
+        params_to_update_backbone = list(
+            self.feature_extractor_UAV.parameters()
+        ) + list(self.feature_extractor_satellite.parameters())
+        params_to_update_fusion = list(self.fusion.parameters())
+
+        optimizer = AdamW(
+            [
+                {"params": params_to_update_backbone, "lr": self.lr_backbone},
+                {"params": params_to_update_fusion, "lr": self.lr_fusion},
+            ],
+            lr=self.lr_backbone,
+        )
+
+        scheduler = MultiStepLR(optimizer, milestones=self.milestones, gamma=self.gamma)
+
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": scheduler,
+        }
+
+    def training_step(self, batch, batch_idx):
+        uav_images, uav_labels, sat_images, sat_gt_hm = batch
+
+        fused_maps = self(uav_images, sat_images)
+        loss = self.criterion(fused_maps, sat_gt_hm)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        uav_images, uav_labels, sat_images, sat_gt_hm = batch
+
+        fused_maps = self(uav_images, sat_images)
+        loss = self.criterion(fused_maps, sat_gt_hm)
+        return loss

@@ -1,0 +1,47 @@
+data:
+  uav_dataset_dir: "/home/spagnologasper/Documents/uav-localization-experiments/drone_dataset"
+  satellite_dataset_dir: "/home/spagnologasper/Documents/uav-localization-experiments/satellite_dataset"
+  sat_zoom_level: 16 
+  uav_patch_width: 128
+  uav_patch_height: 128 
+  heatmap_kernel_size: 15
+  test_from_train_ratio: 0.2
+  uav_scales:
+    - 1.0
+  transform_mean:
+    - 0.485
+    - 0.456
+    - 0.406
+  transform_std:
+    - 0.229
+    - 0.224
+    - 0.225
+
+model:
+  satellite_resolution: [400, 400]
+  lr_fusion: 0.01
+  lr_backbone: 0.01
+  drops_UAV:
+    dropout: 0.1
+    attn_drop: 0.1
+    proj_drop: 0.1
+    head_drop: 0.1
+    mlp_drop1: 0.1
+    mlp_drop2: 0.1
+    pos_drops: 0.05
+  drops_satellite:
+    dropout: 0.1
+    attn_drop: 0.1
+    proj_drop: 0.1
+    head_drop: 0.1
+    mlp_drop1: 0.1
+    mlp_drop2: 0.1
+    pos_drops: 0.05
+  fusion_dropout: 0.1
+  pretrained_twins: true
+  milestones: 
+    - 2
+    - 4
+    - 6
+    - 8
+  gamma: 0.2

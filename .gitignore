@@ -1,4 +1,6 @@
 .venv/**
-lightning_logs/**
+**/lightning_logs/
 drone_dataset/**
 satellite_dataset/**
+**/__pycache__/
+**/*.pyc
