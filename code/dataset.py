@@ -270,6 +270,9 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
     #### Satellite image methods ####
 
     def download_missing_tile(self, tile: mercantile.Tile) -> None:
+        """
+        Downloads the given tile from Mapbox and saves it to the satellite dataset directory.
+        """
         os.makedirs(f"{self.satellite_dataset_dir}", exist_ok=True)
         file_path = f"{self.satellite_dataset_dir}/{tile.z}_{tile.x}_{tile.y}.jpg"
 
@@ -307,6 +310,9 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             print("Error downloading tile. Max retries exceeded.")
 
     def get_tiff_map(self, tile: mercantile.Tile) -> (np.ndarray, dict):
+        """
+        Returns a TIFF map of the given tile.
+        """
         tile_data = []
         neighbors = mercantile.neighbors(tile)
         neighbors.append(tile)
@@ -424,12 +430,18 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
     def get_tile_from_coord(
         self, lat: float, lng: float, zoom_level: int
     ) -> mercantile.Tile:
+        """
+        Returns the tile containing the given coordinates.
+        """
         tile = mercantile.tile(lng, lat, zoom_level)
         return tile
 
     def geo_to_pixel_coordinates(
         self, lat: float, lon: float, transform: rasterio.transform.Affine
     ) -> (int, int):
+        """
+        Converts a pair of (lat, lon) coordinates to pixel coordinates.
+        """
         x_pixel, y_pixel = ~transform * (lon, lat)
         return round(x_pixel), round(y_pixel)
 
@@ -449,9 +461,9 @@ def test():
         transform_std=[0.229, 0.224, 0.225],
     )
 
-    # dataloader = torch.utils.data.DataLoader(
-    #    dataset, batch_size=1, shuffle=True, num_workers=1
-    # )
+    dataloader = torch.utils.data.DataLoader(
+        dataset, batch_size=1, shuffle=True, num_workers=1
+    )
 
     (
         sat_patch,

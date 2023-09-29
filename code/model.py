@@ -14,21 +14,14 @@ class Xcorr(nn.Module):
     Cross-correlation module.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(Xcorr, self).__init__()
 
         self.batch_norm = nn.BatchNorm2d(1)
 
-    def forward(self, query, search_map):
+    def forward(self, query: torch.Tensor, search_map: torch.Tensor) -> torch.Tensor:
         """
         Compute the cross-correlation between a query and a search map.
-
-        Parameters:
-        query: A 4D tensor of shape (batch_size, channels, query_height, query_width).
-        search_map: A 4D tensor of shape (batch_size, channels, search_map_height, search_map_width).
-
-        Returns:
-        corr_maps: A tensor of correlation maps.
         """
 
         # Pad search map to maintain spatial resolution
@@ -56,7 +49,13 @@ class Xcorr(nn.Module):
 
 
 class Fusion(nn.Module):
-    def __init__(self, in_channels, out_channels, upsample_size, fusion_dropout):
+    def __init__(
+        self,
+        in_channels: tuple,
+        out_channels: int,
+        upsample_size: tuple,
+        fusion_dropout: float,
+    ) -> None:
         """
         Fusion module which is a type of convolutional neural network.
 
@@ -67,12 +66,6 @@ class Fusion(nn.Module):
         This module utilizes several 1x1 convolutions and correlation layers
         for the fusion process. The fusion is controlled by learnable weights
         for each level of the pyramid.
-
-        Args:
-            in_channels (tuple): Tuple of 3 elements specifying the number of
-            input channels for the 3 layers of the pyramid.
-            out_channels (int): The number of output channels for the convolution operations.
-            upsample_size (tuple): Tuple specifying the height and width for the output of the module.
         """
 
         super(Fusion, self).__init__()
@@ -218,19 +211,11 @@ class Fusion(nn.Module):
         self.upsample_size = upsample_size
         self.fusion_weights = nn.Parameter(torch.ones(3))
 
-    def forward(self, sat_feature_pyramid, UAV_feature_pyramid):
+    def forward(
+        self, sat_feature_pyramid: list, UAV_feature_pyramid: list
+    ) -> torch.Tensor:
         """
         Perform the forward pass of the Fusion module.
-
-        Args:
-            sat_feature_pyramid (list of torch.Tensor): List of 3 tensors representing the satellite feature pyramid.
-            Each tensor is of shape (batch_size, channels, height, width).
-            UAV_feature_pyramid (list of torch.Tensor): List of 3 tensors representing the UAV feature pyramid.
-            Each tensor is of shape (batch_size, channels, height, width).
-
-        Returns:
-            fused_map (torch.Tensor): The fused feature map resulting from the fusion of the input feature pyramids.
-            The shape is (batch_size, channels, upsample_size[0], upsample_size[1]).
         """
         s1_UAV_feature = UAV_feature_pyramid[0]
         s2_UAV_feature = UAV_feature_pyramid[1]
@@ -276,15 +261,19 @@ class Fusion(nn.Module):
 
 
 class SaveLayerFeatures(nn.Module):
-    def __init__(self):
+    """
+    A module that saves the output of a layer during forward pass.
+    """
+
+    def __init__(self) -> None:
         super(SaveLayerFeatures, self).__init__()
         self.outputs = None
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         self.outputs = x.clone()
         return x
 
-    def clear(self):
+    def clear(self) -> None:
         self.outputs = None
 
 
@@ -292,13 +281,9 @@ class ModifiedPCPVT(nn.Module):
     """
     A modified PVT (Pyramid Vision Transformer) model which saves features from
     its first three blocks during forward pass.
-
-    Args:
-        original_model: (nn.Module) The original PVT model to modify.
-
     """
 
-    def __init__(self, original_model, drops):
+    def __init__(self, original_model: nn.Module, drops: dict) -> None:
         super(ModifiedPCPVT, self).__init__()
 
         # Change the structure of the PCPVT model
@@ -324,7 +309,7 @@ class ModifiedPCPVT(nn.Module):
         if drops is not None:
             self._set_dropout_values(self.model, drops)
 
-    def _set_dropout_values(self, model, dropout_values):
+    def _set_dropout_values(self, model: nn.Module, dropout_values: dict) -> None:
         """
         Regulates the dropout values of the model.
         """
@@ -343,7 +328,7 @@ class ModifiedPCPVT(nn.Module):
                 for drop in module.pos_drops:
                     drop.p = dropout_values.get("pos_drops", drop.p)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> list:
         self.save_l0.clear()
         self.save_l1.clear()
         self.save_l2.clear()
@@ -365,20 +350,16 @@ class CrossViewLocalizationModel(nn.Module):
     This model uses two modified PVT models for feature extraction from the satellite
     and UAV views, respectively. The extracted features are then passed through a Fusion
     module to produce a fused feature map.
-
-    Args:
-        satellite_resolution: (Tuple[int, int]) The resolution of the satellite images.
-
     """
 
     def __init__(
         self,
-        satellite_resolution,
-        drops_UAV,
-        drops_satellite,
-        fusion_dropout,
-        pretrained_twins,
-    ):
+        satellite_resolution: tuple,
+        drops_UAV: dict,
+        drops_satellite: dict,
+        fusion_dropout: float,
+        pretrained_twins: bool = True,
+    ) -> None:
         super(CrossViewLocalizationModel, self).__init__()
 
         self.satellite_resolution = satellite_resolution
