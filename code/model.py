@@ -409,7 +409,6 @@ class CrossViewLocalizationModel(nn.Module):
         )
 
     def forward(self, x_UAV, x_satellite):
-
         feature_pyramid_UAV = self.feature_extractor_UAV(x_UAV)
         feature_pyramid_satellite = self.feature_extractor_satellite(x_satellite)
 

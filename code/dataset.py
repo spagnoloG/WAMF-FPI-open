@@ -12,7 +12,6 @@ import mercantile
 from rasterio.io import MemoryFile
 from rasterio.transform import from_bounds
 from rasterio.merge import merge
-from rasterio.windows import Window
 import rasterio
 import time
 import requests
@@ -103,9 +102,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             x_offset,
             y_offset,
             zoom_level,
-        ) = self.get_random_tiff_patch(
-            lat, lon, self.sat_patch_h, self.sat_patch_w
-        )
+        ) = self.get_random_tiff_patch(lat, lon, self.sat_patch_h, self.sat_patch_w)
 
         uav_image_scale = self.uav_scales[(idx % len(self.uav_scales))]
 
@@ -169,7 +166,6 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             * self.test_from_train_ratio
             / self.get_number_of_city_samples()
         )
-
 
         for entry in entries:
             entry_path = os.path.join(directory, entry)
@@ -273,11 +269,9 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
 
     #### Satellite image methods ####
 
-    def download_missing_tile(self, tile):
+    def download_missing_tile(self, tile: mercantile.Tile) -> None:
         os.makedirs(f"{self.satellite_dataset_dir}", exist_ok=True)
-        file_path = (
-            f"{self.satellite_dataset_dir}/{tile.z}_{tile.x}_{tile.y}.jpg"
-        )
+        file_path = f"{self.satellite_dataset_dir}/{tile.z}_{tile.x}_{tile.y}.jpg"
 
         if os.path.exists(file_path):
             return
@@ -312,7 +306,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         else:
             print("Error downloading tile. Max retries exceeded.")
 
-    def get_tiff_map(self, tile):
+    def get_tiff_map(self, tile: mercantile.Tile) -> (np.ndarray, dict):
         tile_data = []
         neighbors = mercantile.neighbors(tile)
         neighbors.append(tile)
@@ -386,7 +380,9 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
 
         return mosaic, out_meta
 
-    def get_random_tiff_patch(self, lat, lon, patch_width, patch_height):
+    def get_random_tiff_patch(
+        self, lat: float, lon: float, patch_width: int, patch_height: int
+    ) -> (np.ndarray, int, int, int, int, rasterio.transform.Affine):
         """
         Returns a random patch from the satellite image.
         """
@@ -419,24 +415,23 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
 
         # Update x, y to reflect the clamping of x_offset and y_offset
         x, y = x_pixel - x_offset, y_pixel - y_offset
-        patch = mosaic[:, y_offset:y_offset + patch_height, x_offset:x_offset + patch_width]
+        patch = mosaic[
+            :, y_offset : y_offset + patch_height, x_offset : x_offset + patch_width
+        ]
 
         return patch, x, y, x_offset, y_offset, transform
 
-        # Read the data within the window
-        x, y = x_pixel - x_offset, y_pixel - y_offset
-        patch = mosaic[:, y : y + patch_height, x : x + patch_width]
-
-        return patch, x, y, x_offset, y_offset, transform
-
-    def get_tile_from_coord(self, lat, lng, zoom_level):
+    def get_tile_from_coord(
+        self, lat: float, lng: float, zoom_level: int
+    ) -> mercantile.Tile:
         tile = mercantile.tile(lng, lat, zoom_level)
         return tile
 
-    def geo_to_pixel_coordinates(self, lat, lon, transform):
+    def geo_to_pixel_coordinates(
+        self, lat: float, lon: float, transform: rasterio.transform.Affine
+    ) -> (int, int):
         x_pixel, y_pixel = ~transform * (lon, lat)
         return round(x_pixel), round(y_pixel)
-
 
 
 def test():
@@ -473,12 +468,14 @@ def test():
     )
 
     import matplotlib.pyplot as plt
+
     ## Plot the satellite patch and the point on the satellite patch
     fig, axs = plt.subplots(1, 1, figsize=(20, 6))
     axs.imshow(sat_patch.transpose(1, 2, 0))
     axs.scatter(x_sat, y_sat, c="r")
     axs.set_title("Satellite patch")
-    plt.savefig('output.png')
+    plt.savefig("output.png")
+
 
 if __name__ == "__main__":
     test()

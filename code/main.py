@@ -8,6 +8,7 @@ import pytorch_lightning as pl
 import os
 import shutil
 
+
 class DataModule(pl.LightningDataModule):
     def prepare_data(self):
         MNIST(root="./data", train=True, download=True)
