@@ -78,7 +78,7 @@ class DistanceModule(nn.Module):
         self.rds_k_factor = rds_k_factor
 
     def forward(
-        self, heatmaps_pred: torch.Tensor, drone_infos: dict
+        self, heatmaps_pred: torch.Tensor, uav_labels: dict
     ) -> (torch.Tensor, torch.Tensor):
         metre_distances = torch.zeros(
             len(heatmaps_pred)
@@ -93,15 +93,19 @@ class DistanceModule(nn.Module):
             coords = torch.where(heatmaps_pred[idx] == heatmaps_pred[idx].max())
             y_pred, x_pred = coords[0][0].item(), coords[1][0].item()
 
-            patch_transform = drone_infos["patch_transform"][idx]
+            patch_transform_values = [
+                uav_labels["patch_transform"][i][idx] for i in range(6)
+            ]
+
+            patch_transform = rasterio.transform.Affine(*patch_transform_values)
 
             lat_pred, lon_pred = self.pixel_to_geo_coordinates(
                 x_pred, y_pred, patch_transform
             )
 
             lat_gt, lon_gt = (
-                drone_infos["coordinate"]["latitude"][idx].item(),
-                drone_infos["coordinate"]["longitude"][idx].item(),
+                uav_labels["coordinate"]["latitude"][idx].item(),
+                uav_labels["coordinate"]["longitude"][idx].item(),
             )
 
             distance = self.haversine(lon_pred, lat_pred, lon_gt, lat_gt)

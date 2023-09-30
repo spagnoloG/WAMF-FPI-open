@@ -267,7 +267,7 @@ def test():
     )
 
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=16, shuffle=True, num_workers=16
+        dataset, batch_size=4, shuffle=True, num_workers=16
     )
 
     print("Testing patch retrieval & transformation...")
@@ -304,11 +304,11 @@ def test():
     pytest.approx(lat, query_lat, abs=1e-5)
     pytest.approx(lon, query_lon, abs=1e-5)
     print("Test passed.")
-    exit()
 
     ## Plot the satellite patch and the point on the satellite patch
     for i, (uav_image, img_info, satellite_patch, heatmap) in enumerate(dataloader):
-        print(i)
+        print(img_info)
+        break
 
 
 if __name__ == "__main__":

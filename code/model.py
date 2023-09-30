@@ -9,7 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import MultiStepLR
-from criterion import HanningLoss
+from criterion import HanningLoss, DistanceModule
 import pytorch_lightning as pl
 
 
@@ -376,7 +376,25 @@ class CrossViewLocalizationModel(pl.LightningModule):
         self.lr_fusion = lr_fusion
         self.gamma = gamma
         self.criterion = HanningLoss()
+        self.distance_module = DistanceModule()
         self.milestones = milestones
+
+        # Statistics
+        self.num_val_samples = 0
+        self.num_train_samples = 0
+        self.metre_distances_distribution = {
+            "below_10": 0,
+            "below_20": 0,
+            "below_30": 0,
+            "below_40": 0,
+            "below_50": 0,
+            "below_60": 0,
+            "below_70": 0,
+            "below_80": 0,
+            "below_90": 0,
+            "below_100": 0,
+        }
+        self.running_rds = 0.0
 
         if pretrained_twins is None:
             pretrained_twins = True
@@ -433,12 +451,29 @@ class CrossViewLocalizationModel(pl.LightningModule):
             "lr_scheduler": scheduler,
         }
 
+    def _fill_metre_distances_distribution(self, metre_distances):
+        thresholds = list(range(10, 101, 10))  # [10, 20, ..., 100]
+
+        for distance in metre_distances:
+            for threshold in thresholds:
+                key = f"below_{threshold}"
+                if distance < threshold:
+                    self.metre_distances_distribution[key] += 1
+                else:
+                    break
+
     def training_step(self, batch, batch_idx):
         uav_images, uav_labels, sat_images, sat_gt_hm = batch
 
         fused_maps = self(uav_images, sat_images)
         loss = self.criterion(fused_maps, sat_gt_hm)
-        # self.log('my_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+
+        metre_distances, rds_values = self.distance_module(fused_maps, uav_labels)
+        self._fill_metre_distances_distribution(metre_distances)
+        self.running_rds += rds_values.sum().item()
+
+        self.num_train_samples += batch[0].shape[0]
+        self.log("hann", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -446,4 +481,30 @@ class CrossViewLocalizationModel(pl.LightningModule):
 
         fused_maps = self(uav_images, sat_images)
         loss = self.criterion(fused_maps, sat_gt_hm)
+        self.num_val_samples += batch[0].shape[0]
         return loss
+
+    def _normalize_metre_distances_distribution(self, num_samples: int):
+        for key in self.metre_distances_distribution.keys():
+            self.metre_distances_distribution[key] /= num_samples
+
+    def _pretty_print_metre_distances_distribution(self):
+        print("-- Metre distances distribution --")
+        for key, value in self.metre_distances_distribution.items():
+            print(f"{key}: {value}")
+        print("----------------------------------")
+
+    def _clear_metre_distances_distribution(self):
+        for key in self.metre_distances_distribution.keys():
+            self.metre_distances_distribution[key] = 0
+
+    def on_epoch_end(self):
+        self._normalize_metre_distances_distribution(
+            self.num_train_samples
+            if self.trainer.current_fn == "training_step"
+            else self.num_val_samples
+        )
+        self._pretty_print_metre_distances_distribution()
+        self._clear_metre_distances_distribution()
+        self.num_train_samples = 0
+        self.num_val_samples = 0
