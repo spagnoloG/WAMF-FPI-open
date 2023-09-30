@@ -288,11 +288,23 @@ def test():
         400,
     )
 
+    lat, lon = dataset.sat_utils.pixel_to_geo_coordinates(
+        x_sat + x_offset, y_sat + y_offset, patch_transform
+    )
+
+    print("Query lat: ", query_lat)
+    print("Query lon: ", query_lon)
+    print("Retrieved lat: ", lat)
+    print("Retrieved lon: ", lon)
+
     lat, lon = dataset.sat_utils.pixel_to_geo_coordinates(x_sat, y_sat, patch_transform)
+    print("Retrieved lat: ", lat)
+    print("Retrieved lon: ", lon)
 
     pytest.approx(lat, query_lat, abs=1e-5)
     pytest.approx(lon, query_lon, abs=1e-5)
     print("Test passed.")
+    exit()
 
     ## Plot the satellite patch and the point on the satellite patch
     for i, (uav_image, img_info, satellite_patch, heatmap) in enumerate(dataloader):

@@ -3,14 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 import rasterio
-import mercantile
-from PIL import Image
-import os
-from rasterio.io import MemoryFile
-import gc
-from rasterio.transform import from_bounds
-from rasterio.merge import merge
-import numpy as np
 
 
 class HanningLoss(nn.Module):
@@ -75,58 +67,84 @@ class HanningLoss(nn.Module):
         return batch_loss / batch_size
 
 
-def get_tiff_map(self, tile: mercantile.Tile) -> (np.ndarray, dict):
+class DistanceModule(nn.Module):
     """
-    Returns a TIFF map of the given tile.
+    Computes the Metre Distance (MD) between predicted lat-lon and ground
+    truth lat-lon coordinates and Relative Distance Score (RDS).
     """
-    tile_data = []
-    neighbors = mercantile.neighbors(tile)
-    neighbors.append(tile)
 
-    for neighbor in neighbors:
-        west, south, east, north = mercantile.bounds(neighbor)
-        tile_path = (
-            f"{self.satellite_dataset_dir}/{neighbor.z}_{neighbor.x}_{neighbor.y}.jpg"
+    def __init__(self, rds_k_factor: int = 10) -> None:
+        super(DistanceModule, self).__init__()
+        self.rds_k_factor = rds_k_factor
+
+    def forward(
+        self, heatmaps_pred: torch.Tensor, drone_infos: dict
+    ) -> (torch.Tensor, torch.Tensor):
+        metre_distances = torch.zeros(
+            len(heatmaps_pred)
+        )  # Initialize tensor to store distances
+
+        rds_scores = torch.zeros(len(heatmaps_pred))
+
+        for idx in range(len(heatmaps_pred)):
+            heatmap_width = heatmaps_pred[idx].shape[1]
+            heatmap_height = heatmaps_pred[idx].shape[0]
+
+            coords = torch.where(heatmaps_pred[idx] == heatmaps_pred[idx].max())
+            y_pred, x_pred = coords[0][0].item(), coords[1][0].item()
+
+            patch_transform = drone_infos["patch_transform"][idx]
+
+            lat_pred, lon_pred = self.pixel_to_geo_coordinates(
+                x_pred, y_pred, patch_transform
+            )
+
+            lat_gt, lon_gt = (
+                drone_infos["coordinate"]["latitude"][idx].item(),
+                drone_infos["coordinate"]["longitude"][idx].item(),
+            )
+
+            distance = self.haversine(lon_pred, lat_pred, lon_gt, lat_gt)
+            metre_distances[idx] = distance
+            dx = abs(lon_pred - lon_gt)
+            dy = abs(lat_pred - lat_gt)
+            rds_scores[idx] = torch.exp(
+                -self.rds_k_factor
+                * (
+                    torch.sqrt(
+                        ((dx / heatmap_width) ** 2) + ((dy / heatmap_height) ** 2)
+                    )
+                    / 2
+                )
+            )
+
+        return metre_distances, rds_scores
+
+    def haversine(self, lon1: float, lat1: float, lon2: float, lat2: float) -> float:
+        """
+        Calculate the great circle distance in meters between two points
+        on the earth (specified in decimal degrees)
+        """
+        # Convert decimal degrees to radians
+        lon1, lat1, lon2, lat2 = map(math.radians, [lon1, lat1, lon2, lat2])
+
+        # Haversine formula
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
+        a = (
+            math.sin(dlat / 2) ** 2
+            + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
         )
-        if not os.path.exists(tile_path):
-            self.download_missing_tile(neighbor)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = 6371 * c * 1000  # Multiply by 1000 to get meters
 
-        with Image.open(tile_path) as img:
-            width, height = img.size
-        memfile = MemoryFile()
-        with memfile.open(
-            driver="GTiff",
-            height=height,
-            width=width,
-            count=3,
-            dtype="uint8",
-            crs="EPSG:3857",
-            transform=from_bounds(west, south, east, north, width, height),
-        ) as dataset:
-            data = rasterio.open(tile_path).read()
-            dataset.write(data)
-        tile_data.append(memfile.open())
-        memfile.close()
+        return distance
 
-    mosaic, out_trans = merge(tile_data)
-
-    out_meta = tile_data[0].meta.copy()
-    out_meta.update(
-        {
-            "driver": "GTiff",
-            "height": mosaic.shape[1],
-            "width": mosaic.shape[2],
-            "transform": out_trans,
-            "crs": "EPSG:3857",
-        }
-    )
-
-    # Clean up MemoryFile instances to free up memory
-    for td in tile_data:
-        td.close()
-
-    del neighbors
-    del tile_data
-    gc.collect()
-
-    return mosaic, out_meta
+    def pixel_to_geo_coordinates(
+        self, x: int, y: int, transform: rasterio.transform.Affine
+    ) -> (float, float):
+        """
+        Converts a pair of pixel coordinates to (lat, lon) coordinates.
+        """
+        lon, lat = transform * (x, y)
+        return lat, lon

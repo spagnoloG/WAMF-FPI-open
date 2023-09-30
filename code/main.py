@@ -92,10 +92,10 @@ class DataModule(pl.LightningDataModule):
         )
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train_dataset, batch_size=4, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=8, shuffle=True)
 
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(self.val_dataset, batch_size=4, shuffle=True)
+        return DataLoader(self.val_dataset, batch_size=8, shuffle=True)
 
 
 cli = LightningCLI(model_class=CrossViewLocalizationModel, datamodule_class=DataModule)
