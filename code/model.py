@@ -438,6 +438,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
 
         fused_maps = self(uav_images, sat_images)
         loss = self.criterion(fused_maps, sat_gt_hm)
+        # self.log('my_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):

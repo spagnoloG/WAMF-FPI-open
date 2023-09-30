@@ -4,7 +4,7 @@ data:
   sat_zoom_level: 16 
   uav_patch_width: 128
   uav_patch_height: 128 
-  heatmap_kernel_size: 15
+  heatmap_kernel_size: 33
   test_from_train_ratio: 0.2
   uav_scales:
     - 1.0
