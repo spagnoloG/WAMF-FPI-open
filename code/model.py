@@ -13,6 +13,8 @@ from criterion import HanningLoss, DistanceModule
 import pytorch_lightning as pl
 import wandb
 import pandas as pd
+from plot_utils import PlottingUtils
+import matplotlib.pyplot as plt
 
 
 class Xcorr(nn.Module):
@@ -426,6 +428,8 @@ class CrossViewLocalizationModel(pl.LightningModule):
             fusion_dropout=self.fusion_dropout,
         )
 
+        self.plotting_utils = PlottingUtils()
+
         self.save_hyperparameters()
 
     def forward(self, x_UAV, x_satellite):
@@ -489,7 +493,17 @@ class CrossViewLocalizationModel(pl.LightningModule):
         self.log(
             "hann_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
         )
-        return loss
+
+        return {
+            "metre_distances": metre_distances,
+            "rds_values": rds_values,
+            "fused_maps": fused_maps,
+            "uav_labels": uav_labels,
+            "sat_images": sat_images,
+            "uav_images": uav_images,
+            "sat_gt_hm": sat_gt_hm,
+            "loss": loss,
+        }
 
     def validation_step(self, batch, batch_idx):
         uav_images, uav_labels, sat_images, sat_gt_hm = batch
@@ -507,7 +521,17 @@ class CrossViewLocalizationModel(pl.LightningModule):
         self.log(
             "hann_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
         )
-        return loss
+
+        return {
+            "metre_distances": metre_distances,
+            "rds_values": rds_values,
+            "fused_maps": fused_maps,
+            "uav_labels": uav_labels,
+            "sat_images": sat_images,
+            "uav_images": uav_images,
+            "sat_gt_hm": sat_gt_hm,
+            "loss": loss,
+        }
 
     def _normalize_metre_distances_distribution(
         self, num_samples: int, metre_distances_distribution: dict
@@ -567,3 +591,55 @@ class CrossViewLocalizationModel(pl.LightningModule):
         self._clear_metre_distances_distribution(self.val_metre_distances_distribution)
         self.num_val_samples = 0
         self.val_rds = 0.0
+
+    def on_validation_batch_end(self, outputs, batch, batch_idx):
+        if batch_idx != 0:
+            return
+
+        rds_values = outputs["rds_values"]
+        metre_distances = outputs["metre_distances"]
+        fused_maps = outputs["fused_maps"]
+        uav_labels = outputs["uav_labels"]
+        sat_images = outputs["sat_images"]
+        uav_images = outputs["uav_images"]
+        sat_gt_hms = outputs["sat_gt_hm"]
+
+        for i, (
+            rds_value,
+            metre_distance,
+            fused_map,
+            sat_image,
+            uav_image,
+            sat_gt_hm,
+        ) in enumerate(
+            zip(
+                rds_values,
+                metre_distances,
+                fused_maps,
+                sat_images,
+                uav_images,
+                sat_gt_hms,
+            )
+        ):
+            x_sat = uav_labels["x_sat"][i].item()
+            y_sat = uav_labels["y_sat"][i].item()
+
+            fig = self.plotting_utils.plot_results(
+                uav_image,
+                sat_image,
+                sat_gt_hm,
+                fused_map,
+                x_sat,
+                y_sat,
+            )
+
+            image_name = f"batch_{batch_idx}_image_{i}"
+
+            log_data = {
+                f"{image_name}/rds_value": rds_value,
+                f"{image_name}/metre_distance": metre_distance,
+                f"{image_name}/plot": wandb.Image(fig),
+            }
+            plt.close(fig)
+
+            wandb.log(log_data)

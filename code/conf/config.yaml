@@ -1,4 +1,3 @@
-seed_everything: 3841570033
 trainer:
   accelerator: auto
   strategy: auto

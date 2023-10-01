@@ -47,6 +47,18 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             ]
         )
 
+        self.inverse_transforms = transforms.Compose(
+            [
+                transforms.Normalize(
+                    mean=[
+                        -m / s for m, s in zip(self.transform_mean, self.transform_std)
+                    ],
+                    std=[1 / s for s in self.transform_std],
+                ),
+                transforms.ToPILImage(),
+            ]
+        )
+
         self.sat_utils = SatUtils(
             self.satellite_dataset_dir, self.sat_zoom_level, self.heatmap_kernel_size
         )
