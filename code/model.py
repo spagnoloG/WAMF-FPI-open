@@ -11,6 +11,8 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import MultiStepLR
 from criterion import HanningLoss, DistanceModule
 import pytorch_lightning as pl
+import wandb
+import pandas as pd
 
 
 class Xcorr(nn.Module):
@@ -455,6 +457,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
 
     def _fill_metre_distances_distribution(self, metre_distances):
         thresholds = list(range(10, 101, 10))  # [10, 20, ..., 100]
+        thresholds = thresholds[::-1]  # [100, 90, ..., 10]
 
         for distance in metre_distances:
             for threshold in thresholds:
@@ -489,26 +492,41 @@ class CrossViewLocalizationModel(pl.LightningModule):
         return loss
 
     def _normalize_metre_distances_distribution(self, num_samples: int):
+        print("befrome normalizing", self.metre_distances_distribution)
         for key in self.metre_distances_distribution.keys():
             self.metre_distances_distribution[key] /= num_samples
+        print("after normalizing", self.metre_distances_distribution)
+        print("num_samples", num_samples)
 
-    def _pretty_print_metre_distances_distribution(self):
-        print("-- Metre distances distribution --")
-        for key, value in self.metre_distances_distribution.items():
-            print(f"{key}: {value}")
-        print("----------------------------------")
+    def _pretty_print_metre_distances_distribution(
+        self, num_samples: int, mode: str = "val"
+    ):
+        metre_distances_distribution_df = pd.DataFrame(
+            self.metre_distances_distribution.items(),
+            columns=["distance", "percentage"],
+        )
+        wandb.log(
+            {
+                f"{mode}_metre_distances_distribution": wandb.Table(
+                    dataframe=metre_distances_distribution_df
+                ),
+            }
+        )
+
+        wandb.log({f"{mode}_running_rds": self.running_rds / num_samples})
 
     def _clear_metre_distances_distribution(self):
         for key in self.metre_distances_distribution.keys():
             self.metre_distances_distribution[key] = 0
 
-    def on_epoch_end(self):
-        self._normalize_metre_distances_distribution(
-            self.num_train_samples
-            if self.trainer.current_fn == "training_step"
-            else self.num_val_samples
+    def on_end(self, mode: str = "train"):
+        num_samples = (
+            self.num_train_samples if mode == "train" else self.num_val_samples
         )
-        self._pretty_print_metre_distances_distribution()
+        self._normalize_metre_distances_distribution(num_samples)
+        self._pretty_print_metre_distances_distribution(num_samples, mode=mode)
         self._clear_metre_distances_distribution()
-        self.num_train_samples = 0
-        self.num_val_samples = 0
+        if mode == "train":
+            self.num_train_samples = 0
+        else:
+            self.num_val_samples = 0

@@ -4,3 +4,6 @@ drone_dataset/**
 satellite_dataset/**
 **/__pycache__/
 **/*.pyc
+**/cross-view-localization-model/
+**/wandb/
+code/config.yaml
