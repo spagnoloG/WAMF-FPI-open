@@ -420,6 +420,8 @@ class CrossViewLocalizationModel(pl.LightningModule):
             fusion_dropout=self.fusion_dropout,
         )
 
+        self.save_hyperparameters()
+
     def forward(self, x_UAV, x_satellite):
         feature_pyramid_UAV = self.feature_extractor_UAV(x_UAV)
         feature_pyramid_satellite = self.feature_extractor_satellite(x_satellite)
@@ -473,7 +475,9 @@ class CrossViewLocalizationModel(pl.LightningModule):
         self.running_rds += rds_values.sum().item()
 
         self.num_train_samples += batch[0].shape[0]
-        self.log("hann", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log(
+            "hann_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
+        )
         return loss
 
     def validation_step(self, batch, batch_idx):
