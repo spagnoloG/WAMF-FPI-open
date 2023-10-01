@@ -24,11 +24,11 @@ class LogPredictionsCallback(pl.Callback):
         if batch_idx == 0:
             pass
 
-    def on_train_epoch_end(self, trainer, pl_module):
-        pl_module.on_end(mode="train")
+    # def on_train_epoch_end(self, trainer, pl_module):
+    #    pl_module.on_end(mode="train")
 
-    def on_validation_epoch_end(self, trainer, pl_module):
-        pl_module.on_end(mode="val")
+    # def on_validation_epoch_end(self, trainer, pl_module):
+    #    pl_module.on_end(mode="val")
 
 
 if __name__ == "__main__":

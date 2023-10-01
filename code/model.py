@@ -384,7 +384,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
         # Statistics
         self.num_val_samples = 0
         self.num_train_samples = 0
-        self.metre_distances_distribution = {
+        self.train_metre_distances_distribution = {
             "below_10": 0,
             "below_20": 0,
             "below_30": 0,
@@ -396,7 +396,11 @@ class CrossViewLocalizationModel(pl.LightningModule):
             "below_90": 0,
             "below_100": 0,
         }
-        self.running_rds = 0.0
+        self.val_metre_distances_distribution = (
+            self.train_metre_distances_distribution.copy()
+        )
+        self.train_rds = 0.0
+        self.val_rds = 0.0
 
         if pretrained_twins is None:
             pretrained_twins = True
@@ -455,7 +459,9 @@ class CrossViewLocalizationModel(pl.LightningModule):
             "lr_scheduler": scheduler,
         }
 
-    def _fill_metre_distances_distribution(self, metre_distances):
+    def _fill_metre_distances_distribution(
+        self, metre_distances, metre_distances_distribution: dict
+    ):
         thresholds = list(range(10, 101, 10))  # [10, 20, ..., 100]
         thresholds = thresholds[::-1]  # [100, 90, ..., 10]
 
@@ -463,7 +469,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
             for threshold in thresholds:
                 key = f"below_{threshold}"
                 if distance < threshold:
-                    self.metre_distances_distribution[key] += 1
+                    metre_distances_distribution[key] += 1
                 else:
                     break
 
@@ -474,8 +480,10 @@ class CrossViewLocalizationModel(pl.LightningModule):
         loss = self.criterion(fused_maps, sat_gt_hm)
 
         metre_distances, rds_values = self.distance_module(fused_maps, uav_labels)
-        self._fill_metre_distances_distribution(metre_distances)
-        self.running_rds += rds_values.sum().item()
+        self._fill_metre_distances_distribution(
+            metre_distances, self.train_metre_distances_distribution
+        )
+        self.train_rds += rds_values.sum().item()
 
         self.num_train_samples += batch[0].shape[0]
         self.log(
@@ -488,21 +496,33 @@ class CrossViewLocalizationModel(pl.LightningModule):
 
         fused_maps = self(uav_images, sat_images)
         loss = self.criterion(fused_maps, sat_gt_hm)
+
+        metre_distances, rds_values = self.distance_module(fused_maps, uav_labels)
+        self._fill_metre_distances_distribution(
+            metre_distances, self.val_metre_distances_distribution
+        )
+        self.val_rds += rds_values.sum().item()
+
         self.num_val_samples += batch[0].shape[0]
+        self.log(
+            "hann_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True
+        )
         return loss
 
-    def _normalize_metre_distances_distribution(self, num_samples: int):
-        print("befrome normalizing", self.metre_distances_distribution)
-        for key in self.metre_distances_distribution.keys():
-            self.metre_distances_distribution[key] /= num_samples
-        print("after normalizing", self.metre_distances_distribution)
-        print("num_samples", num_samples)
+    def _normalize_metre_distances_distribution(
+        self, num_samples: int, metre_distances_distribution: dict
+    ):
+        for key in metre_distances_distribution.keys():
+            metre_distances_distribution[key] /= num_samples
 
     def _pretty_print_metre_distances_distribution(
-        self, num_samples: int, mode: str = "val"
+        self,
+        num_samples: int,
+        metre_distances_distribution: dict,
+        mode: str = "val",
     ):
         metre_distances_distribution_df = pd.DataFrame(
-            self.metre_distances_distribution.items(),
+            metre_distances_distribution.items(),
             columns=["distance", "percentage"],
         )
         wandb.log(
@@ -513,20 +533,37 @@ class CrossViewLocalizationModel(pl.LightningModule):
             }
         )
 
-        wandb.log({f"{mode}_running_rds": self.running_rds / num_samples})
-
-    def _clear_metre_distances_distribution(self):
-        for key in self.metre_distances_distribution.keys():
-            self.metre_distances_distribution[key] = 0
-
-    def on_end(self, mode: str = "train"):
-        num_samples = (
-            self.num_train_samples if mode == "train" else self.num_val_samples
-        )
-        self._normalize_metre_distances_distribution(num_samples)
-        self._pretty_print_metre_distances_distribution(num_samples, mode=mode)
-        self._clear_metre_distances_distribution()
         if mode == "train":
-            self.num_train_samples = 0
+            wandb.log({f"{mode}_running_rds": self.train_rds / num_samples})
         else:
-            self.num_val_samples = 0
+            wandb.log({f"{mode}_running_rds": self.val_rds / num_samples})
+
+    def _clear_metre_distances_distribution(self, metre_distances_distribution: dict):
+        for key in metre_distances_distribution.keys():
+            metre_distances_distribution[key] = 0
+
+    def on_train_epoch_end(self):
+        num_samples = self.num_train_samples
+        self._normalize_metre_distances_distribution(
+            num_samples, self.train_metre_distances_distribution
+        )
+        self._pretty_print_metre_distances_distribution(
+            num_samples, self.train_metre_distances_distribution, mode="train"
+        )
+        self._clear_metre_distances_distribution(
+            self.train_metre_distances_distribution
+        )
+        self.num_train_samples = 0
+        self.train_rds = 0.0
+
+    def on_validation_epoch_end(self):
+        num_samples = self.num_val_samples
+        self._normalize_metre_distances_distribution(
+            num_samples, self.val_metre_distances_distribution
+        )
+        self._pretty_print_metre_distances_distribution(
+            num_samples, self.val_metre_distances_distribution, mode="val"
+        )
+        self._clear_metre_distances_distribution(self.val_metre_distances_distribution)
+        self.num_val_samples = 0
+        self.val_rds = 0.0
