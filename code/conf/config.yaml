@@ -3,7 +3,7 @@ trainer:
   strategy: auto
   devices: auto
   num_nodes: 1
-  precision: 16-mixed
+  precision: 32 
   logger: null
   callbacks: null
   fast_dev_run: false
@@ -86,3 +86,7 @@ data:
   - 0.229
   - 0.224
   - 0.225
+  val_dataloader_batch_size: 4
+  val_dataloader_num_workers: 16
+  train_dataloader_batch_size: 4
+  train_dataloader_num_workers: 16

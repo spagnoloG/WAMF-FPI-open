@@ -19,6 +19,10 @@ class DataModule(pl.LightningDataModule):
         uav_scales: List[float],
         transform_mean: List[float],
         transform_std: List[float],
+        val_dataloader_batch_size: int,
+        val_dataloader_num_workers: int,
+        train_dataloader_batch_size: int,
+        train_dataloader_num_workers: int,
         *args,
         **kwargs
     ) -> None:
@@ -33,6 +37,10 @@ class DataModule(pl.LightningDataModule):
         self.uav_scales = uav_scales
         self.transform_mean = transform_mean
         self.transform_std = transform_std
+        self.val_dataloader_batch_size = val_dataloader_batch_size
+        self.val_dataloader_num_workers = val_dataloader_num_workers
+        self.train_dataloader_batch_size = train_dataloader_batch_size
+        self.train_dataloader_num_workers = train_dataloader_num_workers
 
     @classmethod
     def add_argparse_args(cls, parent_parser: ArgumentParser) -> ArgumentParser:
@@ -55,6 +63,11 @@ class DataModule(pl.LightningDataModule):
         parser.add_argument(
             "--transform_std", type=float, nargs="+", default=[0.229, 0.224, 0.225]
         )
+        parser.add_argument("--val_dataloader_batch_size", type=int, default=4)
+        parser.add_argument("--val_dataloader_num_workers", type=int, default=16)
+        parser.add_argument("--train_dataloader_batch_size", type=int, default=4)
+        parser.add_argument("--train_dataloader_num_workers", type=int, default=16)
+
         return parser
 
     def prepare_data(self) -> None:
@@ -92,8 +105,16 @@ class DataModule(pl.LightningDataModule):
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
-            self.train_dataset, batch_size=8, shuffle=True, num_workers=16
+            self.train_dataset,
+            batch_size=self.train_dataloader_batch_size,
+            shuffle=True,
+            num_workers=self.train_dataloader_num_workers,
         )
 
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(self.val_dataset, batch_size=8, shuffle=False, num_workers=16)
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.val_dataloader_batch_size,
+            shuffle=False,
+            num_workers=self.val_dataloader_num_workers,
+        )

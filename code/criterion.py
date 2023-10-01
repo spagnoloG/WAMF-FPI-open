@@ -89,13 +89,6 @@ class DistanceModule(nn.Module):
             heatmap_width = heatmaps_pred[idx].shape[1]
             heatmap_height = heatmaps_pred[idx].shape[0]
 
-            max_val = heatmaps_pred[idx].max()
-
-            if torch.isnan(max_val):  # TODO: Check why this happens
-                metre_distances[idx] = torch.tensor(float("inf"))
-                rds_scores[idx] = torch.tensor(0.0)
-                continue
-
             coords = torch.where(heatmaps_pred[idx] == heatmaps_pred[idx].max())
             y_pred, x_pred = coords[0][0].item(), coords[1][0].item()
 
