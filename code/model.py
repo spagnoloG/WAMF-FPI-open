@@ -592,10 +592,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
         self.num_val_samples = 0
         self.val_rds = 0.0
 
-    def on_validation_batch_end(self, outputs, batch, batch_idx):
-        if batch_idx != 0:
-            return
-
+    def _on_batch_end(self, outputs, batch, batch_idx, mode: str = "train"):
         rds_values = outputs["rds_values"]
         metre_distances = outputs["metre_distances"]
         fused_maps = outputs["fused_maps"]
@@ -633,7 +630,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
                 y_sat,
             )
 
-            image_name = f"batch_{batch_idx}_image_{i}"
+            image_name = f"{mode}_batch_{batch_idx}_image_{i}"
 
             log_data = {
                 f"{image_name}/rds_value": rds_value,
@@ -643,3 +640,13 @@ class CrossViewLocalizationModel(pl.LightningModule):
             plt.close(fig)
 
             wandb.log(log_data)
+
+    def on_validation_batch_end(self, outputs, batch, batch_idx):
+        if batch_idx != 0:
+            return
+        self._on_batch_end(outputs, batch, batch_idx, mode="val")
+
+    # def on_train_batch_end(self, outputs, batch, batch_idx):
+    #    if batch_idx != 0:
+    #        return
+    #    self._on_batch_end(outputs, batch, batch_idx, mode="train")

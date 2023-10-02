@@ -13,8 +13,8 @@ trainer:
   max_steps: -1
   min_steps: null
   max_time: null
-  limit_train_batches: 0.1
-  limit_val_batches: 0.1
+  limit_train_batches: 1
+  limit_val_batches: 1
   limit_test_batches: null
   limit_predict_batches: null
   overfit_batches: 0.0
@@ -28,8 +28,8 @@ trainer:
   accumulate_grad_batches: 1
   gradient_clip_val: null
   gradient_clip_algorithm: null
-  deterministic: null
-  benchmark: null
+  deterministic: true 
+  benchmark: true 
   inference_mode: true
   use_distributed_sampler: true
   profiler: null
@@ -61,8 +61,8 @@ model:
     pos_drops: 0.05
   fusion_dropout: 0.1
   pretrained_twins: true
-  lr_backbone: 0.01
-  lr_fusion: 0.01
+  lr_backbone: 0.0001
+  lr_fusion: 0.0004
   milestones:
   - 2
   - 4
@@ -70,15 +70,18 @@ model:
   - 8
   gamma: 0.2
 data:
-  uav_dataset_dir: "/home/spagnologasper/Documents/uav-localization-experiments/drone_dataset"
-  satellite_dataset_dir: "/home/spagnologasper/Documents/uav-localization-experiments/satellite_dataset"
-  sat_zoom_level: 16
+  uav_dataset_dir: "/mnt/drive/uav_dataset"
+  satellite_dataset_dir: "/mnt/drive/satellite_dataset"
+  sat_zoom_level: 17
   uav_patch_width: 128
   uav_patch_height: 128
   heatmap_kernel_size: 33
   test_from_train_ratio: 0.1
   uav_scales:
+  - 2.0
   - 3.0
+  - 4.0
+  - 5.0
   transform_mean:
   - 0.485
   - 0.456
@@ -87,7 +90,7 @@ data:
   - 0.229
   - 0.224
   - 0.225
-  val_dataloader_batch_size: 4
+  val_dataloader_batch_size: 16
   val_dataloader_num_workers: 16
-  train_dataloader_batch_size: 4
+  train_dataloader_batch_size: 16
   train_dataloader_num_workers: 16
