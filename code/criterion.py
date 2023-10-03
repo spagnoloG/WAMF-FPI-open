@@ -107,10 +107,16 @@ class DistanceModule(nn.Module):
                 uav_labels["coordinate"]["longitude"][idx].item(),
             )
 
+            x_gt, y_gt = (
+                uav_labels["x_sat"][idx].item(),
+                uav_labels["y_sat"][idx].item(),
+            )
+
             distance = self.haversine(lon_pred, lat_pred, lon_gt, lat_gt)
             metre_distances[idx] = distance
-            dx = abs(lon_pred - lon_gt)
-            dy = abs(lat_pred - lat_gt)
+
+            dx = torch.tensor(abs(x_pred - x_gt))
+            dy = torch.tensor(abs(y_pred - y_gt))
             rds_scores[idx] = torch.exp(
                 -self.rds_k_factor
                 * (
