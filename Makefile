@@ -16,3 +16,6 @@ push-ml-node:
 		--include="*.txt" \
 		--exclude='*' \
 		. ml-node:/home/ml-node/Documents/uav-localization-experiments
+
+lint:
+	black code/*py

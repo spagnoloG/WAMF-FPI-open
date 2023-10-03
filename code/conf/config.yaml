@@ -40,6 +40,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 0
   default_root_dir: null
 model:
+  predict_checkpoint_path: "./checkpoints/c_1/epoch=12-step=32214-v1.ckpt"
   satellite_resolution:
   - 400
   - 400

@@ -118,3 +118,11 @@ class DataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=self.val_dataloader_num_workers,
         )
+
+    def predict_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.val_dataset,
+            batch_size=self.val_dataloader_batch_size,
+            shuffle=False,
+            num_workers=self.val_dataloader_num_workers,
+        )

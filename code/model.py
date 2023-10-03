@@ -15,6 +15,8 @@ import wandb
 import pandas as pd
 from plot_utils import PlottingUtils
 import matplotlib.pyplot as plt
+import os
+import json
 
 
 class Xcorr(nn.Module):
@@ -371,6 +373,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
         lr_fusion: float = 1e-4,
         milestones: list = [2, 4, 6, 8],
         gamma: float = 0.1,
+        predict_checkpoint_path: str = None,
     ) -> None:
         super(CrossViewLocalizationModel, self).__init__()
 
@@ -382,6 +385,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
         self.criterion = HanningLoss()
         self.distance_module = DistanceModule()
         self.milestones = milestones
+        self.predict_checkpoint_path = predict_checkpoint_path
 
         # Statistics
         self.num_val_samples = 0
@@ -650,3 +654,64 @@ class CrossViewLocalizationModel(pl.LightningModule):
     #    if batch_idx != 0:
     #        return
     #    self._on_batch_end(outputs, batch, batch_idx, mode="train")
+
+    def predict_step(self, batch, batch_idx):
+        uav_images, uav_labels, sat_images, sat_gt_hm = batch
+
+        fused_maps = self(uav_images, sat_images)
+
+        metre_distances, rds_values = self.distance_module(fused_maps, uav_labels)
+        log_dir = self.predict_checkpoint_path.rsplit("/", 1)[0]
+        os.makedirs(f"{log_dir}/predictions", exist_ok=True)
+
+        for i, (
+            uav_image,
+            sat_image,
+            sat_gt_hm,
+            fused_map,
+            rds_value,
+            metre_distance,
+        ) in enumerate(
+            zip(
+                uav_images,
+                sat_images,
+                sat_gt_hm,
+                fused_maps,
+                rds_values,
+                metre_distances,
+            )
+        ):
+            x_sat = uav_labels["x_sat"][i].item()
+            y_sat = uav_labels["y_sat"][i].item()
+
+            fig = self.plotting_utils.plot_results(
+                uav_image,
+                sat_image,
+                sat_gt_hm,
+                fused_map,
+                x_sat,
+                y_sat,
+            )
+
+            image_file = f"{log_dir}/predictions/predict_batch_{batch_idx}_{i}.png"
+            metadata_file = image_file.replace(".png", ".json")
+
+            metadata = {
+                "rds_value": rds_value.item(),
+                "metre_distance": metre_distance.item(),
+            }
+
+            plt.savefig(image_file)
+            with open(metadata_file, "w") as f:
+                json.dump(metadata, f)
+            plt.close(fig)
+
+        return {
+            "metre_distances": metre_distances,
+            "rds_values": rds_values,
+            "fused_maps": fused_maps,
+            "uav_labels": uav_labels,
+            "sat_images": sat_images,
+            "uav_images": uav_images,
+            "sat_gt_hm": sat_gt_hm,
+        }
