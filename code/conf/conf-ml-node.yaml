@@ -13,8 +13,8 @@ trainer:
   max_steps: -1
   min_steps: null
   max_time: null
-  limit_train_batches: 1
-  limit_val_batches: 1
+  limit_train_batches: null
+  limit_val_batches: null
   limit_test_batches: null
   limit_predict_batches: null
   overfit_batches: 0.0
@@ -28,7 +28,7 @@ trainer:
   accumulate_grad_batches: 1
   gradient_clip_val: null
   gradient_clip_algorithm: null
-  deterministic: true 
+  deterministic: false 
   benchmark: true 
   inference_mode: true
   use_distributed_sampler: true
@@ -73,15 +73,15 @@ data:
   uav_dataset_dir: "/mnt/drive/uav_dataset"
   satellite_dataset_dir: "/mnt/drive/satellite_dataset"
   sat_zoom_level: 17
-  uav_patch_width: 128
-  uav_patch_height: 128
+  uav_patch_width: 256 
+  uav_patch_height: 256 
   heatmap_kernel_size: 33
   test_from_train_ratio: 0.1
   uav_scales:
+  - 1.5
   - 2.0
+  - 2.5
   - 3.0
-  - 4.0
-  - 5.0
   transform_mean:
   - 0.485
   - 0.456

@@ -6,6 +6,7 @@ push-ml-node:
 		--exclude='satellite_dataset/' \
 		--exclude='__pycache__/' \
 		--exclude='drone_dataset' \
+		--exclude='code/checkpoints/**' \
 		--exclude="code/cross-view-localization-model/**" \
 		--exclude="code/__pycache__/**" \
 		--exclude="code/wandb/**" \

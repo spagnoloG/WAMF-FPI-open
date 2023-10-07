@@ -40,7 +40,7 @@ trainer:
   reload_dataloaders_every_n_epochs: 0
   default_root_dir: null
 model:
-  predict_checkpoint_path: "./checkpoints/c_1/epoch=12-step=32214-v1.ckpt"
+  predict_checkpoint_path: "./checkpoints/c_2/epoch=14-step=27885-v1.ckpt"
   satellite_resolution:
   - 400
   - 400
@@ -74,12 +74,12 @@ data:
   uav_dataset_dir: "/home/spagnologasper/Documents/uav-localization-experiments/drone_dataset"
   satellite_dataset_dir: "/home/spagnologasper/Documents/uav-localization-experiments/satellite_dataset"
   sat_zoom_level: 16
-  uav_patch_width: 128
-  uav_patch_height: 128
+  uav_patch_width: 256 
+  uav_patch_height: 256 
   heatmap_kernel_size: 33
   test_from_train_ratio: 0.1
   uav_scales:
-  - 3.0
+  - 1.5
   transform_mean:
   - 0.485
   - 0.456

@@ -1,5 +1,3 @@
-#! /usr/bin/env python3
-
 from argparse import ArgumentParser
 import os
 import json
@@ -33,9 +31,19 @@ def main(pred_dir: str):
             os.path.join(pred_dir, image_file), os.path.join(pred_dir, new_image_name)
         )
 
+    # Generate report
+    report = {}
+    for i in range(10, 101, 10):
+        count = sum(1 for _, dist in distances if dist < i)
+        report[f"below_{i}m"] = count
+
+    with open(os.path.join(pred_dir, "report.json"), "w") as f:
+        json.dump(report, f, indent=4)
+
 
 if __name__ == "__main__":
     argparser = ArgumentParser()
     argparser.add_argument("pred_dir", type=str, help="Path to predictions directory")
     args = argparser.parse_args()
     main(args.pred_dir)
+

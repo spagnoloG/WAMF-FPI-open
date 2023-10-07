@@ -198,7 +198,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
 
                 if number is None:
                     continue
-                if "Test" in entry_path or (
+                if ("Test" in entry_path and number < images_to_take_per_folder) or (
                     number < images_to_take_per_folder and "Train" in entry_path
                 ):
                     if entry_path.endswith(".jpeg"):
@@ -267,12 +267,12 @@ def test():
     dataset = GeoLocalizationDataset(
         uav_dataset_dir="/home/spagnologasper/Documents/uav-localization-experiments/drone_dataset",
         satellite_dataset_dir="/home/spagnologasper/Documents/uav-localization-experiments/satellite_dataset",
-        dataset="train",
+        dataset="test",
         sat_zoom_level=16,
         uav_patch_width=128,
         uav_patch_height=128,
         heatmap_kernel_size=33,
-        test_from_train_ratio=0.0,
+        test_from_train_ratio=0.1,
         uav_scales=[1.0],
         transform_mean=[0.485, 0.456, 0.406],
         transform_std=[0.229, 0.224, 0.225],
