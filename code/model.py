@@ -374,6 +374,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
         milestones: list = [2, 4, 6, 8],
         gamma: float = 0.1,
         predict_checkpoint_path: str = None,
+        heatmap_kernel_size: int = 33,
     ) -> None:
         super(CrossViewLocalizationModel, self).__init__()
 
@@ -382,7 +383,7 @@ class CrossViewLocalizationModel(pl.LightningModule):
         self.lr_backbone = lr_backbone
         self.lr_fusion = lr_fusion
         self.gamma = gamma
-        self.criterion = HanningLoss()
+        self.criterion = HanningLoss(kernel_size=heatmap_kernel_size)
         self.distance_module = DistanceModule()
         self.milestones = milestones
         self.predict_checkpoint_path = predict_checkpoint_path
