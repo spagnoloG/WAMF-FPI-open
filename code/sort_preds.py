@@ -46,4 +46,3 @@ if __name__ == "__main__":
     argparser.add_argument("pred_dir", type=str, help="Path to predictions directory")
     args = argparser.parse_args()
     main(args.pred_dir)
-

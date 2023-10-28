@@ -8,7 +8,7 @@ from torchvision import transforms
 from PIL import Image
 import numpy as np
 from torchvision.transforms import functional as F
-from sat_utils import SatUtils
+from arcgis_sat_utils import SatUtils
 
 
 class GeoLocalizationDataset(torch.utils.data.Dataset):
@@ -20,11 +20,15 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         sat_zoom_level: int = 16,
         uav_patch_width: int = 128,
         uav_patch_height: int = 128,
+        sat_patch_width: int = 400,
+        sat_patch_height: int = 400,
         heatmap_kernel_size: int = 33,
         test_from_train_ratio: float = 0.0,
-        uav_scales: List[float] = [1.0],
         transform_mean: List[float] = [0.485, 0.456, 0.406],
         transform_std: List[float] = [0.229, 0.224, 0.225],
+        sat_available_years: List[str] = ["2023", "2021", "2019", "2016"],
+        rotation_angles: List[int] = [0, 45, 90, 135, 180, 225, 270, 315],
+        drone_image_scale: int = 1,
     ):
         self.uav_dataset_dir = uav_dataset_dir
         self.satellite_dataset_dir = satellite_dataset_dir
@@ -34,7 +38,6 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         self.uav_patch_height = uav_patch_height
         self.heatmap_kernel_size = heatmap_kernel_size
         self.test_from_train_ratio = test_from_train_ratio
-        self.uav_scales = uav_scales
         self.transform_mean = transform_mean
         self.transform_std = transform_std
         self.metadata_dict = {}
@@ -46,6 +49,11 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
                 transforms.Normalize(self.transform_mean, self.transform_std),
             ]
         )
+        self.sat_available_years = sat_available_years
+        self.rotation_angles = rotation_angles
+        self.drone_image_scale = drone_image_scale
+        self.sat_patch_width = sat_patch_width
+        self.sat_patch_height = sat_patch_height
 
         self.inverse_transforms = transforms.Compose(
             [
@@ -64,7 +72,11 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         )
 
     def __len__(self) -> int:
-        return len(self.entry_paths) * len(self.uav_scales)
+        return (
+            len(self.entry_paths)
+            * len(self.rotation_angles)
+            * len(self.sat_available_years)
+        )
 
     def __getitem__(self, idx) -> (torch.Tensor, dict, torch.Tensor, torch.Tensor):
         """
@@ -72,7 +84,12 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         and satellite images, along with their associated heatmap and metadata.
         """
 
-        image_path = self.entry_paths[idx // len(self.uav_scales)]
+        image_path_index = idx // (
+            len(self.rotation_angles) * len(self.sat_available_years)
+        )
+        sat_year = self.sat_available_years[idx % len(self.sat_available_years)]
+
+        image_path = self.entry_paths[image_path_index]
         uav_image = Image.open(image_path).convert("RGB")  # Ensure 3-channel image
 
         lookup_str, file_number = self.extract_info_from_filename(image_path)
@@ -92,15 +109,14 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             y_offset,
             patch_transform,
         ) = self.sat_utils.get_random_tiff_patch(
-            lat, lon, 400, 400
-        )  # TODO: make patch size a parameter
-
-        uav_image_scale = self.uav_scales[(idx % len(self.uav_scales))]
+            lat, lon, self.sat_patch_width, self.sat_patch_height, sat_year
+        )
 
         # Rotate crop center and transform image
-        h = np.ceil(uav_image.height // uav_image_scale).astype(int)
-        w = np.ceil(uav_image.width // uav_image_scale).astype(int)
+        h = np.ceil(uav_image.height // self.drone_image_scale).astype(int)
+        w = np.ceil(uav_image.width // self.drone_image_scale).astype(int)
 
+        uav_image = F.to_tensor(uav_image)
         uav_image = F.resize(uav_image, [h, w])
         uav_image = F.center_crop(
             uav_image, (self.uav_patch_height, self.uav_patch_width)
@@ -268,14 +284,17 @@ def test():
 
     dataset = GeoLocalizationDataset(
         uav_dataset_dir="/home/spagnologasper/Documents/projects/uav-localization-experiments/drone_dataset",
-        satellite_dataset_dir="/home/spagnologasper/Documents/projects/uav-localization-experiments/satellite_dataset",
+        satellite_dataset_dir="/home/spagnologasper/Documents/projects/historical_satellite_tiles_downloader/tiles",
+        sat_available_years=["2023", "2021", "2019", "2016"],
+        rotation_angles=[0],
         dataset="test",
-        sat_zoom_level=16,
+        sat_zoom_level=17,
         uav_patch_width=128,
         uav_patch_height=128,
+        sat_patch_width=500,
+        sat_patch_height=500,
         heatmap_kernel_size=33,
         test_from_train_ratio=0.1,
-        uav_scales=[1.0],
         transform_mean=[0.485, 0.456, 0.406],
         transform_std=[0.229, 0.224, 0.225],
     )
@@ -285,8 +304,8 @@ def test():
     )
 
     print("Testing patch retrieval & transformation...")
-    query_lat = 46.048992
-    query_lon = 14.509215
+    query_lat = 46.054231
+    query_lon = 14.506483
 
     (
         sat_patch,
@@ -298,8 +317,9 @@ def test():
     ) = dataset.sat_utils.get_random_tiff_patch(
         query_lat,  # latitude
         query_lon,  # longitude
-        400,
-        400,
+        500,
+        500,
+        "2023",
     )
 
     lat, lon = dataset.sat_utils.pixel_to_geo_coordinates(
@@ -318,6 +338,13 @@ def test():
     pytest.approx(lat, query_lat, abs=1e-5)
     pytest.approx(lon, query_lon, abs=1e-5)
     print("Test passed.")
+    import matplotlib.pyplot as plt
+
+    # Plot with the query point
+    plt.imshow(sat_patch.transpose(1, 2, 0))
+    plt.scatter(x_sat, y_sat, c="r")
+    plt.savefig("test2023.png")
+    exit()
 
     ## Plot the satellite patch and the point on the satellite patch
     for i, (uav_image, img_info, satellite_patch, heatmap) in enumerate(dataloader):
