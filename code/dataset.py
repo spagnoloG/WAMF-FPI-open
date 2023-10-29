@@ -318,6 +318,7 @@ def test():
     pytest.approx(lat, query_lat, abs=1e-5)
     pytest.approx(lon, query_lon, abs=1e-5)
     print("Test passed.")
+    exit()
 
     ## Plot the satellite patch and the point on the satellite patch
     for i, (uav_image, img_info, satellite_patch, heatmap) in enumerate(dataloader):

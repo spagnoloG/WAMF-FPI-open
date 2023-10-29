@@ -28,7 +28,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         transform_std: List[float] = [0.229, 0.224, 0.225],
         sat_available_years: List[str] = ["2023", "2021", "2019", "2016"],
         rotation_angles: List[int] = [0, 45, 90, 135, 180, 225, 270, 315],
-        drone_image_scale: int = 1,
+        uav_image_scale: int = 1,
     ):
         self.uav_dataset_dir = uav_dataset_dir
         self.satellite_dataset_dir = satellite_dataset_dir
@@ -51,7 +51,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         )
         self.sat_available_years = sat_available_years
         self.rotation_angles = rotation_angles
-        self.drone_image_scale = drone_image_scale
+        self.uav_image_scale = uav_image_scale
         self.sat_patch_width = sat_patch_width
         self.sat_patch_height = sat_patch_height
 
@@ -109,14 +109,13 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             y_offset,
             patch_transform,
         ) = self.sat_utils.get_random_tiff_patch(
-            lat, lon, self.sat_patch_width, self.sat_patch_height, sat_year
+            lat, lon, self.sat_patch_width, self.sat_patch_height, sat_year, 0
         )
 
         # Rotate crop center and transform image
-        h = np.ceil(uav_image.height // self.drone_image_scale).astype(int)
-        w = np.ceil(uav_image.width // self.drone_image_scale).astype(int)
+        h = np.ceil(uav_image.height // self.uav_image_scale).astype(int)
+        w = np.ceil(uav_image.width // self.uav_image_scale).astype(int)
 
-        uav_image = F.to_tensor(uav_image)
         uav_image = F.resize(uav_image, [h, w])
         uav_image = F.center_crop(
             uav_image, (self.uav_patch_height, self.uav_patch_width)
@@ -139,7 +138,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         img_info["x_offset"] = x_offset
         img_info["y_offset"] = y_offset
         img_info["patch_transform"] = patch_transform
-        img_info["uav_image_scale"] = uav_image_scale
+        img_info["uav_image_scale"] = self. uav_image_scale
 
         return uav_image, img_info, satellite_patch, heatmap
 
@@ -287,7 +286,7 @@ def test():
         satellite_dataset_dir="/home/spagnologasper/Documents/projects/historical_satellite_tiles_downloader/tiles",
         sat_available_years=["2023", "2021", "2019", "2016"],
         rotation_angles=[0],
-        dataset="test",
+        dataset="train",
         sat_zoom_level=17,
         uav_patch_width=128,
         uav_patch_height=128,
@@ -300,12 +299,12 @@ def test():
     )
 
     dataloader = torch.utils.data.DataLoader(
-        dataset, batch_size=4, shuffle=True, num_workers=16
+        dataset, batch_size=4, shuffle=True, num_workers=4
     )
 
     print("Testing patch retrieval & transformation...")
-    query_lat = 46.054231
-    query_lon = 14.506483
+    query_lat = 46.048992
+    query_lon = 14.509215
 
     (
         sat_patch,
@@ -320,6 +319,7 @@ def test():
         500,
         500,
         "2023",
+        0
     )
 
     lat, lon = dataset.sat_utils.pixel_to_geo_coordinates(
@@ -338,18 +338,17 @@ def test():
     pytest.approx(lat, query_lat, abs=1e-5)
     pytest.approx(lon, query_lon, abs=1e-5)
     print("Test passed.")
-    import matplotlib.pyplot as plt
+    #import matplotlib.pyplot as plt
 
-    # Plot with the query point
-    plt.imshow(sat_patch.transpose(1, 2, 0))
-    plt.scatter(x_sat, y_sat, c="r")
-    plt.savefig("test2023.png")
-    exit()
+    ## Plot with the query point
+    #plt.imshow(sat_patch.transpose(1, 2, 0))
+    #plt.scatter(x_sat, y_sat, c="r")
+    #plt.savefig("test2023.png")
+    #exit()
 
     ## Plot the satellite patch and the point on the satellite patch
     for i, (uav_image, img_info, satellite_patch, heatmap) in enumerate(dataloader):
         print(img_info)
-        break
 
 
 if __name__ == "__main__":

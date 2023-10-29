@@ -94,6 +94,7 @@ class SatUtils:
         patch_width: int,
         patch_height: int,
         sat_year: str,
+        rotation_degree: int,
     ) -> (np.ndarray, int, int, int, int, rasterio.transform.Affine):
         """
         Returns a random patch from the satellite image.
