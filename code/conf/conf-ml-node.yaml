@@ -25,7 +25,7 @@ trainer:
   enable_checkpointing: true
   enable_progress_bar: true 
   enable_model_summary: true 
-  accumulate_grad_batches: 4
+  accumulate_grad_batches: 2
   gradient_clip_val: null
   gradient_clip_algorithm: null
   deterministic: false 
@@ -71,14 +71,29 @@ model:
   heatmap_kernel_size: 81
 data:
   uav_dataset_dir: "/mnt/drive/uav_dataset"
-  satellite_dataset_dir: "/mnt/drive/satellite_dataset"
-  sat_zoom_level: 16
+  satellite_dataset_dir: "/mnt/drive/tiles"
+  sat_zoom_level: 17
   uav_patch_width: 320
   uav_patch_height: 320 
+  sat_patch_width: 400
+  sat_patch_height: 400
   heatmap_kernel_size: 81
   test_from_train_ratio: 0.0
-  uav_scales:
-  - 1.0
+  uav_image_scale: 1.0
+  rotation_angles:
+    - 0
+    - 45
+    - 90
+    - 135
+    - 180
+    - 225
+    - 270
+    - 315
+  sat_available_years:
+    - "2016"
+    - "2019"
+    - "2021"
+    - "2023"
   transform_mean:
   - 0.485
   - 0.456
@@ -87,7 +102,7 @@ data:
   - 0.229
   - 0.224
   - 0.225
-  val_dataloader_batch_size: 4
+  val_dataloader_batch_size: 8
   val_dataloader_num_workers: 24
-  train_dataloader_batch_size: 4
+  train_dataloader_batch_size: 8
   train_dataloader_num_workers: 24

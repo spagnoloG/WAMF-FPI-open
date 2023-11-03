@@ -8,7 +8,7 @@ from torchvision import transforms
 from PIL import Image
 import numpy as np
 from torchvision.transforms import functional as F
-from arcgis_sat_utils import SatUtils
+from arcgis_sat_utils_v2 import SatUtils
 
 
 class GeoLocalizationDataset(torch.utils.data.Dataset):
@@ -87,11 +87,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         image_path_index = idx // (
             len(self.rotation_angles) * len(self.sat_available_years)
         )
-
         sat_year = self.sat_available_years[idx % len(self.sat_available_years)]
-        rot_angle = self.rotation_angles[
-            (idx // len(self.sat_available_years)) % len(self.rotation_angles)
-        ]
 
         image_path = self.entry_paths[image_path_index]
         uav_image = Image.open(image_path).convert("RGB")  # Ensure 3-channel image
@@ -120,7 +116,6 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         h = np.ceil(uav_image.height // self.uav_image_scale).astype(int)
         w = np.ceil(uav_image.width // self.uav_image_scale).astype(int)
 
-        uav_image = F.rotate(uav_image, rot_angle)
         uav_image = F.resize(uav_image, [h, w])
         uav_image = F.center_crop(
             uav_image, (self.uav_patch_height, self.uav_patch_width)

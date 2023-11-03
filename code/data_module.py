@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 from torch.utils.data import DataLoader
 import pytorch_lightning as pl
-from dataset import GeoLocalizationDataset
+from arcgis_dataset import GeoLocalizationDataset
 from argparse import ArgumentParser
 from typing import List
 
@@ -14,11 +14,15 @@ class DataModule(pl.LightningDataModule):
         sat_zoom_level: int,
         uav_patch_width: int,
         uav_patch_height: int,
+        sat_patch_height: int,
+        sat_patch_width: int,
         heatmap_kernel_size: int,
         test_from_train_ratio: float,
-        uav_scales: List[float],
         transform_mean: List[float],
         transform_std: List[float],
+        sat_available_years: List[str],
+        rotation_angles: List[int],
+        uav_image_scale: float,
         val_dataloader_batch_size: int,
         val_dataloader_num_workers: int,
         train_dataloader_batch_size: int,
@@ -32,15 +36,20 @@ class DataModule(pl.LightningDataModule):
         self.sat_zoom_level = sat_zoom_level
         self.uav_patch_width = uav_patch_width
         self.uav_patch_height = uav_patch_height
+        self.sat_patch_height = sat_patch_height
+        self.sat_patch_width = sat_patch_width
         self.heatmap_kernel_size = heatmap_kernel_size
         self.test_from_train_ratio = test_from_train_ratio
-        self.uav_scales = uav_scales
         self.transform_mean = transform_mean
         self.transform_std = transform_std
         self.val_dataloader_batch_size = val_dataloader_batch_size
         self.val_dataloader_num_workers = val_dataloader_num_workers
         self.train_dataloader_batch_size = train_dataloader_batch_size
         self.train_dataloader_num_workers = train_dataloader_num_workers
+        self.sat_available_years = sat_available_years
+        self.rotation_angles = rotation_angles
+        self.uav_image_scale = uav_image_scale
+
 
     @classmethod
     def add_argparse_args(cls, parent_parser: ArgumentParser) -> ArgumentParser:
@@ -54,9 +63,11 @@ class DataModule(pl.LightningDataModule):
         parser.add_argument("--sat_zoom_level", type=int, default=19)
         parser.add_argument("--uav_patch_width", type=int, default=256)
         parser.add_argument("--uav_patch_height", type=int, default=256)
+        parser.add_argument("--sat_patch_width", type=int, default=256)
+        parser.add_argument("--sat_patch_height", type=int, default=256)
         parser.add_argument("--heatmap_kernel_size", type=int, default=15)
         parser.add_argument("--test_from_train_ratio", type=float, default=0.2)
-        parser.add_argument("--uav_scales", type=float, nargs="+", default=[1.0])
+        parser.add_argument("--uav_image_scale", type=float, default=1.0)
         parser.add_argument(
             "--transform_mean", type=float, nargs="+", default=[0.485, 0.456, 0.406]
         )
@@ -67,6 +78,8 @@ class DataModule(pl.LightningDataModule):
         parser.add_argument("--val_dataloader_num_workers", type=int, default=16)
         parser.add_argument("--train_dataloader_batch_size", type=int, default=4)
         parser.add_argument("--train_dataloader_num_workers", type=int, default=16)
+        parser.add_argument("--sat_available_years", type=str, nargs="+", default=["2019"])
+        parser.add_argument("--rotation_angles", type=int, nargs="+", default=[0, 90, 180, 270])
 
         return parser
 
@@ -83,10 +96,14 @@ class DataModule(pl.LightningDataModule):
                 uav_patch_height=self.uav_patch_height,
                 heatmap_kernel_size=self.heatmap_kernel_size,
                 test_from_train_ratio=self.test_from_train_ratio,
-                uav_scales=self.uav_scales,
                 transform_mean=self.transform_mean,
                 transform_std=self.transform_std,
                 dataset="train",
+                uav_image_scale=self.uav_image_scale,
+                rotation_angles=self.rotation_angles,
+                sat_available_years=self.sat_available_years,
+                sat_patch_height=self.sat_patch_height,
+                sat_patch_width=self.sat_patch_width,
             )
 
         self.val_dataset = GeoLocalizationDataset(
@@ -97,10 +114,14 @@ class DataModule(pl.LightningDataModule):
             uav_patch_height=self.uav_patch_height,
             heatmap_kernel_size=self.heatmap_kernel_size,
             test_from_train_ratio=self.test_from_train_ratio,
-            uav_scales=self.uav_scales,
+            uav_image_scale=self.uav_image_scale,
             transform_mean=self.transform_mean,
             transform_std=self.transform_std,
             dataset="test",
+            rotation_angles=self.rotation_angles,
+            sat_available_years=self.sat_available_years,
+            sat_patch_height=self.sat_patch_height,
+            sat_patch_width=self.sat_patch_width,
         )
 
     def train_dataloader(self) -> DataLoader:
