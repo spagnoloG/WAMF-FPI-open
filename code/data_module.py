@@ -21,7 +21,7 @@ class DataModule(pl.LightningDataModule):
         transform_mean: List[float],
         transform_std: List[float],
         sat_available_years: List[str],
-        rotation_angles: List[int],
+        rotation_angles: List[float],
         uav_image_scale: float,
         val_dataloader_batch_size: int,
         val_dataloader_num_workers: int,
@@ -81,7 +81,7 @@ class DataModule(pl.LightningDataModule):
             "--sat_available_years", type=str, nargs="+", default=["2019"]
         )
         parser.add_argument(
-            "--rotation_angles", type=int, nargs="+", default=[0, 90, 180, 270]
+            "--rotation_angles", type=float, nargs="+", default=[0, 90, 180, 270]
         )
 
         return parser
