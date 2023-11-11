@@ -684,6 +684,11 @@ class CrossViewLocalizationModel(pl.LightningModule):
         ):
             x_sat = uav_labels["x_sat"][i].item()
             y_sat = uav_labels["y_sat"][i].item()
+            rot_angle = uav_labels["rot_angle"][i].item()
+            lat_gt = uav_labels["coordinate"]["latitude"][i].item()
+            lon_gt = uav_labels["coordinate"]["longitude"][i].item()
+            pt_values = [uav_labels["patch_transform"][j][i] for j in range(6)]
+            drone_im_path = uav_labels["filename"][i]
 
             fig = self.plotting_utils.plot_results(
                 uav_image,
@@ -700,6 +705,13 @@ class CrossViewLocalizationModel(pl.LightningModule):
             metadata = {
                 "rds_value": rds_value.item(),
                 "metre_distance": metre_distance.item(),
+                "x_sat": x_sat,
+                "y_sat": y_sat,
+                "rot_angle": rot_angle,
+                "lat_gt": lat_gt,
+                "lon_gt": lon_gt,
+                "pt_values": pt_values,
+                "drone_im_path": drone_im_path,
             }
 
             plt.savefig(image_file)

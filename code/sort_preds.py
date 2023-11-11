@@ -26,7 +26,9 @@ def main(pred_dir: str):
         )
 
         image_file = json_file.replace(".json", ".png")
-        image_file = image_file.replace("metadata_", "blended_") # Superglue, lightglue and silk
+        image_file = image_file.replace(
+            "metadata_", "blended_"
+        )  # Superglue, lightglue and silk
         new_image_name = f"{index}.png"
         os.rename(
             os.path.join(pred_dir, image_file), os.path.join(pred_dir, new_image_name)

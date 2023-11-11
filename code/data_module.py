@@ -50,7 +50,6 @@ class DataModule(pl.LightningDataModule):
         self.rotation_angles = rotation_angles
         self.uav_image_scale = uav_image_scale
 
-
     @classmethod
     def add_argparse_args(cls, parent_parser: ArgumentParser) -> ArgumentParser:
         parser = ArgumentParser(parents=[parent_parser], add_help=False)
@@ -78,8 +77,12 @@ class DataModule(pl.LightningDataModule):
         parser.add_argument("--val_dataloader_num_workers", type=int, default=16)
         parser.add_argument("--train_dataloader_batch_size", type=int, default=4)
         parser.add_argument("--train_dataloader_num_workers", type=int, default=16)
-        parser.add_argument("--sat_available_years", type=str, nargs="+", default=["2019"])
-        parser.add_argument("--rotation_angles", type=int, nargs="+", default=[0, 90, 180, 270])
+        parser.add_argument(
+            "--sat_available_years", type=str, nargs="+", default=["2019"]
+        )
+        parser.add_argument(
+            "--rotation_angles", type=int, nargs="+", default=[0, 90, 180, 270]
+        )
 
         return parser
 
