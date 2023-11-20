@@ -700,7 +700,11 @@ class CrossViewLocalizationModel(pl.LightningModule):
             #)
 
             image_file = f"{log_dir}/predictions/predict_batch_{batch_idx}_{i}.png"
-            metadata_file = image_file.replace(".png", ".json")
+            #metadata_file = image_file.replace(".png", ".json")
+
+            # WARNING: This is a hack!
+            # TODO: Fix this, it's a hack, now works only for one batch
+            metadata_file = f"{log_dir}/predictions/metadata.json"
 
             metadata = {
                 "rds_value": rds_value.item(),
@@ -714,9 +718,11 @@ class CrossViewLocalizationModel(pl.LightningModule):
                 "drone_im_path": drone_im_path,
             }
 
-            #plt.savefig(image_file)
-            with open(metadata_file, "w") as f:
-                json.dump(metadata, f)
+            # append to metadata file
+            with open(metadata_file, "a") as f:
+                f.write(json.dumps(metadata))
+
+            #plt.savefig(image_file) 
             #plt.close(fig)
 
         return {
