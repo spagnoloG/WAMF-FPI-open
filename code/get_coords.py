@@ -21,7 +21,7 @@ def main(dataset_path: str):
 
                 for entry in data["cameraFrames"]:
                     ff.write(
-                        f"lat: {entry['coordinate']['latitude']}, lon: {entry['coordinate']['latitude']}"
+                        f"lat: {entry['coordinate']['latitude']}, lon: {entry['coordinate']['longitude']}"
                         + "\n"
                     )
 

@@ -8,3 +8,4 @@ satellite_dataset/**
 **/wandb/
 **/checkpoints/
 code/config.yaml
+*.lock

@@ -1,4 +1,4 @@
-# uav-localization-experiments
+# WAMF-FPI-open 
 
 
 ### Start
@@ -9,7 +9,6 @@ python3 -m venv .venv
 pip install -r requirements.txt
 python main.py fit --conf conf/config.yaml # Modify conf based on your requirements
 ```
-
 
 ### Predict from checkpoint
 
