@@ -9,6 +9,8 @@ from PIL import Image
 import numpy as np
 from torchvision.transforms import functional as F
 from arcgis_sat_utils import SatUtils
+import cv2
+import warnings
 
 
 class GeoLocalizationDataset(torch.utils.data.Dataset):
@@ -27,7 +29,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         transform_mean: List[float] = [0.485, 0.456, 0.406],
         transform_std: List[float] = [0.229, 0.224, 0.225],
         sat_available_years: List[str] = ["2023", "2021", "2019", "2016"],
-        rotation_angles: List[int] = [0, 45, 90, 135, 180, 225, 270, 315],
+        rotation_angles: List[float] = [0, 45, 90, 135, 180, 225, 270, 315],
         uav_image_scale: float = 1,
     ):
         self.uav_dataset_dir = uav_dataset_dir
@@ -96,14 +98,25 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         image_path = self.entry_paths[image_path_index]
         uav_image = Image.open(image_path).convert("RGB")  # Ensure 3-channel image
 
+        original_uav_image_width = uav_image.width
+        original_uav_image_height = uav_image.height
+
         lookup_str, file_number = self.extract_info_from_filename(image_path)
         img_info = self.metadata_dict[lookup_str][file_number]
-        img_info["filename"] = image_path
-
+        
         lat, lon = (
             img_info["coordinate"]["latitude"],
             img_info["coordinate"]["longitude"],
         )
+
+        fov_vertical = img_info["fovVertical"]
+
+        try:
+            agl_altitude = float(image_path.split("/")[-1].split("_")[2].split("m")[0])
+        except IndexError:
+            agl_altitude = 150.0
+            warnings.warn( "Could not extract AGL altitude from filename, using default value of 150m.")
+
 
         (
             satellite_patch,
@@ -138,6 +151,25 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             self.heatmap_kernel_size,
         )
 
+        cropped_uav_image_width = self.calculate_cropped_uav_image_width(
+            fov_vertical,
+            original_uav_image_width,
+            original_uav_image_height,
+            self.uav_patch_width,
+            self.uav_patch_height,
+            agl_altitude,
+        )
+        
+        satellite_tile_width = self.calculate_cropped_sat_image_width(
+            lat, self.sat_patch_width, patch_transform
+        )
+
+        scale_factor = cropped_uav_image_width / satellite_tile_width
+
+        img_info["cropped_uav_image_width"] = cropped_uav_image_width
+        img_info["satellite_tile_width"] = satellite_tile_width
+        img_info["scale_factor"] = scale_factor
+        img_info["filename"] = image_path
         img_info["rot_angle"] = rot_angle
         img_info["x_sat"] = x_sat
         img_info["y_sat"] = y_sat
@@ -145,8 +177,86 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         img_info["y_offset"] = y_offset
         img_info["patch_transform"] = patch_transform
         img_info["uav_image_scale"] = self.uav_image_scale
+        img_info["homography_matrix"] = self.compute_homography(
+            rot_angle,
+            x_sat,
+            y_sat,
+            self.uav_patch_width,
+            self.uav_patch_height,
+            scale_factor,
+        )
+        img_info["agl_altitude"] = agl_altitude
+        img_info["original_uav_image_width"] = original_uav_image_width
+        img_info["original_drone_image_height"] = original_uav_image_height
+        img_info["fov_vertical"] = fov_vertical
 
         return uav_image, img_info, satellite_patch, heatmap
+
+
+    def calculate_cropped_sat_image_width(self, latitude, patch_width, patch_transform):
+        """
+        Computes the width of the satellite image in world coordinate units
+        """
+        length_of_degree = 111320 * np.cos(np.radians(latitude))
+        scale_x_meters = patch_transform[0] * length_of_degree
+        satellite_tile_width = patch_width * scale_x_meters
+        return satellite_tile_width
+
+    def calculate_cropped_uav_image_width(self,fov_vertical, orig_width, orig_height, crop_width, crop_height, altitude=150.0):
+        """
+        Computes the width of the UAV image in world coordinate units
+        """
+        # Convert fov from degrees to radians
+        fov_rad = np.radians(fov_vertical)
+
+        # Calculate the full width of the UAV image
+        full_width = 2 * (altitude * np.tan(fov_rad / 2))
+
+        # Determine the cropping ratio
+        crop_ratio_width = crop_width / orig_width
+        crop_ratio_height = crop_height / orig_height
+
+        # Calculate the adjusted horizontal fov
+        fov_horizontal = 2 * np.arctan(np.tan(fov_rad / 2) * (orig_width / orig_height))
+        adjusted_fov_horizontal = 2 * np.arctan(np.tan(fov_horizontal / 2) * crop_ratio_width)
+
+        # Calculate the new full width using the adjusted horizontal fov
+        full_width = 2 * (altitude * np.tan(adjusted_fov_horizontal / 2))
+        
+        # Adjust the width according to the crop ratio
+        cropped_width = full_width * crop_ratio_width
+
+        return cropped_width
+
+    def compute_homography(self, rot_angle, x_sat, y_sat, uav_width, uav_height, scale_factor):
+        # Convert rotation angle to radians
+        theta = np.radians(rot_angle)
+
+        # Rotation matrix
+        R = np.array([[np.cos(theta), -np.sin(theta), 0], 
+                      [np.sin(theta),  np.cos(theta), 0], 
+                      [0,               0,               1]])
+
+        # Scale matrix
+        S = np.array([[scale_factor, 0, 0],
+                      [0, scale_factor, 0],
+                      [0, 0, 1]])
+
+        # Translation matrix to center the UAV image
+        T_uav = np.array([[1, 0, -uav_width / 2], 
+                          [0, 1, -uav_height / 2], 
+                          [0, 0, 1]])
+
+        # Translation matrix to move to the satellite image position
+        T_sat = np.array([[1, 0, x_sat], 
+                          [0, 1, y_sat], 
+                          [0, 0, 1]])
+
+        # Compute the combined homography matrix
+        H = np.dot(T_sat, np.dot(R, np.dot(S, T_uav)))
+
+        return H
+
 
     def count_total_uav_samples(self) -> int:
         """
@@ -286,22 +396,24 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
 
 def test():
     import pytest
+    import matplotlib.pyplot as plt
 
     dataset = GeoLocalizationDataset(
         uav_dataset_dir="/home/spagnologasper/Documents/projects/uav-localization-experiments/drone_dataset",
         satellite_dataset_dir="/home/spagnologasper/Documents/projects/historical_satellite_tiles_downloader/tiles",
         sat_available_years=["2023", "2021", "2019", "2016"],
-        rotation_angles=[0],
+        rotation_angles=[0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5, 180, 202.5, 225, 247.5, 270, 292.5, 315, 337.5],
         dataset="train",
         sat_zoom_level=17,
-        uav_patch_width=128,
-        uav_patch_height=128,
-        sat_patch_width=500,
-        sat_patch_height=500,
+        uav_patch_width=400,
+        uav_patch_height=400,
+        sat_patch_width=400,
+        sat_patch_height=400,
         heatmap_kernel_size=33,
         test_from_train_ratio=0.1,
         transform_mean=[0.485, 0.456, 0.406],
         transform_std=[0.229, 0.224, 0.225],
+        uav_image_scale=2.0,
     )
 
     dataloader = torch.utils.data.DataLoader(
@@ -348,8 +460,53 @@ def test():
     # exit()
 
     ## Plot the satellite patch and the point on the satellite patch
-    for i, (uav_image, img_info, satellite_patch, heatmap) in enumerate(dataloader):
-        print(img_info)
+    for i, (uav_images, img_info, satellite_patches, heatmaps) in enumerate(dataloader):
+
+        for j, (uav_image, satellite_patch, heatmap) in enumerate(zip(uav_images, satellite_patches, heatmaps)): 
+            x_sat = img_info["x_sat"][j].item()
+            y_sat = img_info["y_sat"][j].item()
+            angle = img_info["rot_angle"][j].item()
+            for k, v in img_info.items():
+                for k, val in enumerate(v):
+                    if k == j:
+                        print(k, val)
+            print("Image info: ", img_info)
+            homography_matrix = img_info["homography_matrix"][j].numpy()
+            print("Homography matrix: ", homography_matrix)
+            print("Homography matrix shape: ", homography_matrix.shape)
+            print("Rotated for: ", angle)
+
+            sp = dataset.inverse_transforms(satellite_patch)
+            uav_i = dataset.inverse_transforms(uav_image)
+
+            h, w = sp.size
+            uav_i = np.array(uav_i)
+
+            # Prepare the UAV image for warping
+            uav_warped = cv2.warpPerspective(uav_i, homography_matrix, (w, h))
+
+            # Create a 2x2 subplot
+            fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+
+            # Plot satellite patch and point on the first subplot
+            ax[0, 0].imshow(sp)
+            ax[0, 0].scatter(x_sat, y_sat, c="r")
+            ax[0, 0].set_title("Satellite Patch with Point")
+
+            # Plot UAV image on the second subplot
+            ax[0, 1].imshow(uav_i)
+            ax[0, 1].set_title("UAV Image")
+
+            # Plot heatmap on the third subplot
+            ax[1, 0].imshow(heatmap, cmap='hot', interpolation='nearest')
+            ax[1, 0].set_title("Heatmap")
+
+            # Plot warped UAV image on the satellite patch on the fourth subplot
+            ax[1, 1].imshow(sp)
+            ax[1, 1].imshow(uav_warped, alpha=0.5)  # Adjust alpha for transparency
+            ax[1, 1].set_title("Warped UAV Image on Satellite Patch")
+
+            plt.show()
 
 
 if __name__ == "__main__":
