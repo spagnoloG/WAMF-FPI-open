@@ -108,15 +108,17 @@ class SatUtils:
 
         x_pixel, y_pixel = self.geo_to_pixel_coordinates(lat, lon, transform)
 
-        ks = self.heatmap_kernel_size // 2
+        # TODO
+        # Temporal constant, replace with a better solution
+        KS = 120
 
         x_offset_range = [
-            x_pixel - patch_width + ks + 1,
-            x_pixel - ks - 1,
+            x_pixel - patch_width + KS + 1,
+            x_pixel - KS - 1,
         ]
         y_offset_range = [
-            y_pixel - patch_height + ks + 1,
-            y_pixel - ks - 1,
+            y_pixel - patch_height + KS + 1,
+            y_pixel - KS - 1,
         ]
 
         # Randomly select an offset within the valid range

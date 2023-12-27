@@ -690,17 +690,17 @@ class CrossViewLocalizationModel(pl.LightningModule):
             pt_values = [uav_labels["patch_transform"][j][i].item() for j in range(6)]
             drone_im_path = uav_labels["filename"][i]
 
-            #fig = self.plotting_utils.plot_results(
+            # fig = self.plotting_utils.plot_results(
             #    uav_image,
             #    sat_image,
             #    sat_gt_hm,
             #    fused_map,
             #    x_sat,
             #    y_sat,
-            #)
+            # )
 
             image_file = f"{log_dir}/predictions/predict_batch_{batch_idx}_{i}.png"
-            #metadata_file = image_file.replace(".png", ".json")
+            # metadata_file = image_file.replace(".png", ".json")
 
             # WARNING: This is a hack!
             # TODO: Fix this, it's a hack, now works only for one batch
@@ -722,8 +722,8 @@ class CrossViewLocalizationModel(pl.LightningModule):
             with open(metadata_file, "a") as f:
                 f.write(json.dumps(metadata))
 
-            #plt.savefig(image_file) 
-            #plt.close(fig)
+            # plt.savefig(image_file)
+            # plt.close(fig)
 
         return {
             "metre_distances": metre_distances,
