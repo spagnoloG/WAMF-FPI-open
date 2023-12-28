@@ -6,14 +6,11 @@ import rasterio
 import numpy as np
 import random
 import warnings
-from rasterio.errors import NotGeoreferencedWarning
-from rasterio.io import MemoryFile
-from rasterio.transform import from_bounds
-from rasterio.merge import merge
 from PIL import Image
 import gc
 from osgeo import gdal, osr
 from affine import Affine
+from contextlib import contextmanager
 
 
 class SatUtils:
@@ -31,6 +28,81 @@ class SatUtils:
                 if sub_neighbour not in neighbors:
                     neighbors.append(sub_neighbour)
         return neighbors
+
+    @contextmanager
+    def managed_dataset(self, img_array: np.ndarray):
+        mem_driver = gdal.GetDriverByName("MEM")
+        dataset = mem_driver.Create(
+            "", img_array.shape[1], img_array.shape[0], 3, gdal.GDT_Byte
+        )
+        try:
+            for i in range(3):
+                dataset.GetRasterBand(i + 1).WriteArray(img_array[:, :, i])
+            yield dataset
+        finally:
+            del dataset
+
+    def get_tiff_map(self, tile: mercantile.Tile, sat_year: str) -> (np.ndarray, dict):
+        """
+        Returns a TIFF map of the given tile using GDAL.
+        """
+        tile_data = []
+        neighbors = self.get_5x5_neighbors(tile)
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore")
+            for neighbor in neighbors:
+                tile_path = self.get_tile_path(sat_year, neighbor)
+                if not os.path.exists(tile_path):
+                    raise FileNotFoundError(
+                        f"Tile {neighbor.z}_{neighbor.x}_{neighbor.y} not found."
+                    )
+
+                with Image.open(tile_path) as img:
+                    img_array = np.array(img)
+
+                    with self.managed_dataset(img_array) as dataset:
+                        self.set_dataset_geoinfo(dataset, neighbor, img_array)
+                        tile_data.append(dataset)
+
+        mosaic, out_meta = self.merge_tiles(tile_data)
+        return mosaic, out_meta
+
+    def get_tile_path(self, sat_year: str, neighbor: mercantile.Tile) -> str:
+        return f"{self.satellite_dataset_dir}/{sat_year}/{neighbor.z}_{neighbor.x}_{neighbor.y}.jpg"
+
+    def set_dataset_geoinfo(self, dataset, neighbor, img_array):
+        west, south, east, north = mercantile.bounds(neighbor)
+        geotransform = (
+            west,
+            (east - west) / img_array.shape[1],
+            0,
+            north,
+            0,
+            -(north - south) / img_array.shape[0],
+        )
+        dataset.SetGeoTransform(geotransform)
+        srs = osr.SpatialReference()
+        srs.ImportFromEPSG(3857)
+        dataset.SetProjection(srs.ExportToWkt())
+
+    def merge_tiles(self, tile_data: np.ndarray) -> (np.ndarray, dict):
+        vrt_options = gdal.BuildVRTOptions()
+        vrt = gdal.BuildVRT("", [td for td in tile_data], options=vrt_options)
+        mosaic = vrt.ReadAsArray()
+        out_trans = vrt.GetGeoTransform()
+        out_crs = vrt.GetProjection()
+        out_trans = Affine.from_gdal(*out_trans)
+        out_meta = {
+            "driver": "GTiff",
+            "height": mosaic.shape[1],
+            "width": mosaic.shape[2],
+            "transform": out_trans,
+            "crs": out_crs,
+        }
+        del vrt
+        gc.collect()
+        return mosaic, out_meta
 
     def get_tiff_map(self, tile: mercantile.Tile, sat_year: str) -> (np.ndarray, dict):
         """
