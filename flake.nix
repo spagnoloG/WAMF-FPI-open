@@ -28,6 +28,7 @@
           pytest
           requests
           pytorch-lightning
+          gdal
         ]);
       in {
         devShells.default = pkgs.mkShell {

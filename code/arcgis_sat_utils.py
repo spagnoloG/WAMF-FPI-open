@@ -12,6 +12,8 @@ from rasterio.transform import from_bounds
 from rasterio.merge import merge
 from PIL import Image
 import gc
+from osgeo import gdal, osr
+from affine import Affine
 
 
 class SatUtils:
@@ -32,13 +34,13 @@ class SatUtils:
 
     def get_tiff_map(self, tile: mercantile.Tile, sat_year: str) -> (np.ndarray, dict):
         """
-        Returns a TIFF map of the given tile.
+        Returns a TIFF map of the given tile using GDAL.
         """
         tile_data = []
         neighbors = self.get_5x5_neighbors(tile)
 
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
+            warnings.filterwarnings("ignore")
             for neighbor in neighbors:
                 west, south, east, north = mercantile.bounds(neighbor)
                 tile_path = f"{self.satellite_dataset_dir}/{sat_year}/{neighbor.z}_{neighbor.x}_{neighbor.y}.jpg"
@@ -47,43 +49,55 @@ class SatUtils:
                         f"Tile {neighbor.z}_{neighbor.x}_{neighbor.y} not found."
                     )
 
-                with Image.open(tile_path) as img:
-                    width, height = img.size
-                memfile = MemoryFile()
-                with memfile.open(
-                    driver="GTiff",
-                    height=height,
-                    width=width,
-                    count=3,
-                    dtype="uint8",
-                    crs="EPSG:3857",
-                    transform=from_bounds(west, south, east, north, width, height),
-                ) as dataset:
-                    data = rasterio.open(tile_path).read()
-                    dataset.write(data)
-                tile_data.append(memfile.open())
-                memfile.close()
+                img = Image.open(tile_path)
+                img_array = np.array(img)
 
-            mosaic, out_trans = merge(tile_data)
+                # Create an in-memory GDAL dataset
+                mem_driver = gdal.GetDriverByName("MEM")
+                dataset = mem_driver.Create(
+                    "", img_array.shape[1], img_array.shape[0], 3, gdal.GDT_Byte
+                )
+                for i in range(3):
+                    dataset.GetRasterBand(i + 1).WriteArray(img_array[:, :, i])
 
-            out_meta = tile_data[0].meta.copy()
-            out_meta.update(
-                {
-                    "driver": "GTiff",
-                    "height": mosaic.shape[1],
-                    "width": mosaic.shape[2],
-                    "transform": out_trans,
-                    "crs": "EPSG:3857",
-                }
-            )
+                # Set GeoTransform and Projection
+                geotransform = (
+                    west,
+                    (east - west) / img_array.shape[1],
+                    0,
+                    north,
+                    0,
+                    -(north - south) / img_array.shape[0],
+                )
+                dataset.SetGeoTransform(geotransform)
+                srs = osr.SpatialReference()
+                srs.ImportFromEPSG(3857)
+                dataset.SetProjection(srs.ExportToWkt())
 
-            # Clean up MemoryFile instances to free up memory
-            for td in tile_data:
-                td.close()
+                tile_data.append(dataset)
 
-            del neighbors
-            del tile_data
-            gc.collect()
+        # Merge tiles using GDAL
+        vrt_options = gdal.BuildVRTOptions()
+        vrt = gdal.BuildVRT("", [td for td in tile_data], options=vrt_options)
+        mosaic = vrt.ReadAsArray()
+
+        # Get metadata
+        out_trans = vrt.GetGeoTransform()
+        out_crs = vrt.GetProjection()
+        out_trans = Affine.from_gdal(*out_trans)
+        out_meta = {
+            "driver": "GTiff",
+            "height": mosaic.shape[1],
+            "width": mosaic.shape[2],
+            "transform": out_trans,
+            "crs": out_crs,
+        }
+
+        # Clean up
+        for td in tile_data:
+            td.FlushCache()
+        vrt = None
+        gc.collect()
 
         return mosaic, out_meta
 

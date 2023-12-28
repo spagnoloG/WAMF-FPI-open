@@ -189,6 +189,8 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
 
             # Transform the points
             warped_points = self.warp_points(points, homography_matrix)
+            img_info["warped_points_sat"] = warped_points
+            img_info["warped_points_uav"] = points
 
         img_info["cropped_uav_image_width"] = cropped_uav_image_width
         img_info["satellite_tile_width"] = satellite_tile_width
@@ -201,7 +203,8 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         img_info["y_offset"] = y_offset
         img_info["patch_transform"] = patch_transform
         img_info["uav_image_scale"] = self.uav_image_scale
-        img_info["homography_matrix"] = homography_matrix
+        img_info["homography_matrix_uav_to_sat"] = homography_matrix
+        img_info["homography_matrix_sat_to_uav"] = np.linalg.inv(homography_matrix)
         img_info["agl_altitude"] = agl_altitude
         img_info["original_uav_image_width"] = original_uav_image_width
         img_info["original_drone_image_height"] = original_uav_image_height
@@ -293,9 +296,13 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         """
         Samples four points from the UAV image.
         """
+        PADDING = 10
         points = np.array(
             [
-                [random.randint(0, width - 1), random.randint(0, height - 1)]
+                [
+                    random.randint(0, width - PADDING),
+                    random.randint(0, height - PADDING),
+                ]
                 for _ in range(4)
             ]
         )
@@ -542,9 +549,8 @@ def test():
             x_sat = img_info["x_sat"][j].item()
             y_sat = img_info["y_sat"][j].item()
             angle = img_info["rot_angle"][j].item()
-            homography_matrix = img_info["homography_matrix"][j].numpy()
+            homography_matrix = img_info["homography_matrix_uav_to_sat"][j].numpy()
 
-            print("Homography matrix: ", homography_matrix)
             print("Rotated for: ", angle)
 
             # Inverse transform the satellite patch and UAV image
