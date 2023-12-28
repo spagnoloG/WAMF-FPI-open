@@ -33,6 +33,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         rotation_angles: List[float] = [0, 45, 90, 135, 180, 225, 270, 315],
         uav_image_scale: float = 1,
         use_heatmap: bool = True,
+        subset_size: int = -1,
     ):
         self.uav_dataset_dir = uav_dataset_dir
         self.satellite_dataset_dir = satellite_dataset_dir
@@ -59,6 +60,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         self.use_heatmap = use_heatmap
         self.sat_patch_width = sat_patch_width
         self.sat_patch_height = sat_patch_height
+        self.subset_size = subset_size
 
         self.inverse_transforms = transforms.Compose(
             [
@@ -75,6 +77,15 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         self.sat_utils = SatUtils(
             self.satellite_dataset_dir, self.sat_zoom_level, self.heatmap_kernel_size
         )
+
+        if self.subset_size > 0:
+            ssize = int(
+                self.subset_size
+                / len(self.rotation_angles)
+                / len(self.sat_available_years)
+            )
+            ssize = min(ssize, len(self.entry_paths))
+            self.entry_paths = self.entry_paths[:ssize]
 
     def __len__(self) -> int:
         return (
