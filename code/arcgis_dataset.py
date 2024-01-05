@@ -19,6 +19,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         self,
         uav_dataset_dir: str,
         satellite_dataset_dir: str,
+        misslabeled_images_path: str,
         dataset: Literal["train", "test"],
         sat_zoom_level: int = 16,
         uav_patch_width: int = 128,
@@ -46,8 +47,11 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         self.transform_mean = transform_mean
         self.transform_std = transform_std
         self.metadata_dict = {}
+        self.misslabeled_images_path = misslabeled_images_path
         self.total_uav_samples = self.count_total_uav_samples()
+        self.misslabelled_images = self.read_misslabelled_images(self.misslabeled_images_path)
         self.entry_paths = self.get_entry_paths(self.uav_dataset_dir)
+        self.cleanup_misslabelled_images()
         self.transforms = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -87,6 +91,28 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             ssize = min(ssize, len(self.entry_paths))
             self.entry_paths = self.entry_paths[:ssize]
 
+    def read_misslabelled_images(
+        self, path: str = "misslabels/misslabeled.txt"
+    ) -> List[str]:
+        with open(path, "r") as f:
+            lines = f.readlines()
+        return [line.strip() for line in lines]
+
+    def cleanup_misslabelled_images(self) -> None:
+        indices_to_delete = []
+
+        for image in self.misslabelled_images:
+            for image_path in self.entry_paths:
+                if image in image_path:
+                    index = self.entry_paths.index(image_path)
+                    indices_to_delete.append(index)
+                    break
+
+        sorted_tuples = sorted(indices_to_delete, reverse=True)
+
+        for index in sorted_tuples:
+            self.entry_paths.pop(index)
+
     def __len__(self) -> int:
         return (
             len(self.entry_paths)
@@ -121,6 +147,12 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         lat, lon = (
             img_info["coordinate"]["latitude"],
             img_info["coordinate"]["longitude"],
+        )
+
+        uav_rot_x, uav_rot_y, uav_rot_z = (
+            img_info["rotation"]["x"],
+            img_info["rotation"]["y"],
+            img_info["rotation"]["z"],
         )
 
         fov_vertical = img_info["fovVertical"]
@@ -475,25 +507,27 @@ def test():
         uav_dataset_dir="/home/spagnologasper/Documents/projects/uav-localization-experiments/drone_dataset",
         satellite_dataset_dir="/home/spagnologasper/Documents/projects/historical_satellite_tiles_downloader/tiles",
         sat_available_years=["2023", "2021", "2019", "2016"],
-        rotation_angles=[
-            0,
-            22.5,
-            45,
-            67.5,
-            90,
-            112.5,
-            135,
-            157.5,
-            180,
-            202.5,
-            225,
-            247.5,
-            270,
-            292.5,
-            315,
-            337.5,
-        ],
+        rotation_angles=[1],
+        # rotation_angles=[
+        #    0,
+        #    22.5,
+        #    45,
+        #    67.5,
+        #    90,
+        #    112.5,
+        #    135,
+        #    157.5,
+        #    180,
+        #    202.5,
+        #    225,
+        #    247.5,
+        #    270,
+        #    292.5,
+        #    315,
+        #    337.5,
+        # ],
         dataset="train",
+        misslabeled_images_path="misslabels/misslabeled.txt",
         sat_zoom_level=17,
         uav_patch_width=400,
         uav_patch_height=400,
@@ -562,8 +596,6 @@ def test():
             angle = img_info["rot_angle"][j].item()
             homography_matrix = img_info["homography_matrix_uav_to_sat"][j].numpy()
 
-            print("Rotated for: ", angle)
-
             # Inverse transform the satellite patch and UAV image
             sp = dataset.inverse_transforms(satellite_patch)
             uav_i = dataset.inverse_transforms(uav_image)
@@ -606,9 +638,6 @@ def test():
             os.makedirs("outs", exist_ok=True)
             plt.savefig(f"outs/test_{i}_{j}.png")
             plt.close(fig)  # Close the figure to free memory
-
-            if i == 10:
-                break
 
 
 if __name__ == "__main__":
