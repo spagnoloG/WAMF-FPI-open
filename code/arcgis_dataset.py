@@ -31,7 +31,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         transform_mean: List[float] = [0.485, 0.456, 0.406],
         transform_std: List[float] = [0.229, 0.224, 0.225],
         sat_available_years: List[str] = ["2023", "2021", "2019", "2016"],
-        rotation_angles: List[float] = [0, 45, 90, 135, 180, 225, 270, 315],
+        max_rotation_angle: int = 0,  # 0-180
         uav_image_scale: float = 1,
         use_heatmap: bool = True,
         subset_size: int = -1,
@@ -49,7 +49,9 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         self.metadata_dict = {}
         self.misslabeled_images_path = misslabeled_images_path
         self.total_uav_samples = self.count_total_uav_samples()
-        self.misslabelled_images = self.read_misslabelled_images(self.misslabeled_images_path)
+        self.misslabelled_images = self.read_misslabelled_images(
+            self.misslabeled_images_path
+        )
         self.entry_paths = self.get_entry_paths(self.uav_dataset_dir)
         self.cleanup_misslabelled_images()
         self.transforms = transforms.Compose(
@@ -59,12 +61,12 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             ]
         )
         self.sat_available_years = sat_available_years
-        self.rotation_angles = rotation_angles
         self.uav_image_scale = uav_image_scale
         self.use_heatmap = use_heatmap
         self.sat_patch_width = sat_patch_width
         self.sat_patch_height = sat_patch_height
         self.subset_size = subset_size
+        self.max_rotation_angle = max_rotation_angle
 
         self.inverse_transforms = transforms.Compose(
             [
@@ -83,11 +85,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         )
 
         if self.subset_size > 0:
-            ssize = int(
-                self.subset_size
-                / len(self.rotation_angles)
-                / len(self.sat_available_years)
-            )
+            ssize = int(self.subset_size / len(self.sat_available_years))
             ssize = min(ssize, len(self.entry_paths))
             self.entry_paths = self.entry_paths[:ssize]
 
@@ -114,11 +112,7 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
             self.entry_paths.pop(index)
 
     def __len__(self) -> int:
-        return (
-            len(self.entry_paths)
-            * len(self.rotation_angles)
-            * len(self.sat_available_years)
-        )
+        return len(self.entry_paths) * len(self.sat_available_years)
 
     def __getitem__(self, idx) -> (torch.Tensor, dict, torch.Tensor, torch.Tensor):
         """
@@ -126,14 +120,11 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
         and satellite images, along with their associated heatmap and metadata.
         """
 
-        image_path_index = idx // (
-            len(self.rotation_angles) * len(self.sat_available_years)
-        )
+        image_path_index = idx // (len(self.sat_available_years))
 
         sat_year = self.sat_available_years[idx % len(self.sat_available_years)]
-        rot_angle = self.rotation_angles[
-            (idx // len(self.sat_available_years)) % len(self.rotation_angles)
-        ]
+
+        rot_angle = random.randint(-self.max_rotation_angle, self.max_rotation_angle)
 
         image_path = self.entry_paths[image_path_index]
         uav_image = Image.open(image_path).convert("RGB")  # Ensure 3-channel image
@@ -306,9 +297,6 @@ class GeoLocalizationDataset(torch.utils.data.Dataset):
     def compute_homography(
         self, rot_angle, x_sat, y_sat, uav_width, uav_height, scale_factor
     ):
-        # Adjust rot_angle if it's greater than 180 degrees
-        if rot_angle > 180:
-            rot_angle -= 360
         # Convert rotation angle to radians
         theta = np.radians(rot_angle)
 
@@ -507,25 +495,7 @@ def test():
         uav_dataset_dir="/home/spagnologasper/Documents/projects/uav-localization-experiments/drone_dataset",
         satellite_dataset_dir="/home/spagnologasper/Documents/projects/historical_satellite_tiles_downloader/tiles",
         sat_available_years=["2023", "2021", "2019", "2016"],
-        rotation_angles=[1],
-        # rotation_angles=[
-        #    0,
-        #    22.5,
-        #    45,
-        #    67.5,
-        #    90,
-        #    112.5,
-        #    135,
-        #    157.5,
-        #    180,
-        #    202.5,
-        #    225,
-        #    247.5,
-        #    270,
-        #    292.5,
-        #    315,
-        #    337.5,
-        # ],
+        max_rotation_angle=20,
         dataset="train",
         misslabeled_images_path="misslabels/misslabeled.txt",
         sat_zoom_level=17,
