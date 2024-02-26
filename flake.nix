@@ -75,7 +75,9 @@
             black
           ]);
       in {
-        devShells.default = pkgs.mkShell { buildInputs = [ pythonEnv pkgs.yamlfmt ]; };
+        devShells.default = pkgs.mkShell {
+          buildInputs = [ pythonEnv pkgs.yamlfmt pkgs.direnv ];
+        };
       });
 
 }
