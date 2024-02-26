@@ -1,15 +1,16 @@
-seed_everything: 42 
+---
+seed_everything: 42
 trainer:
   accelerator: auto
   strategy: auto
   devices: auto
   num_nodes: 1
-  precision: 32 
+  precision: 32
   logger: null
   callbacks: null
   fast_dev_run: false
-  max_epochs: 16 
-  min_epochs: 2 
+  max_epochs: 16
+  min_epochs: 2
   max_steps: -1
   min_steps: null
   max_time: null
@@ -23,8 +24,8 @@ trainer:
   num_sanity_val_steps: null
   log_every_n_steps: null
   enable_checkpointing: true
-  enable_progress_bar: true 
-  enable_model_summary: true 
+  enable_progress_bar: true
+  enable_model_summary: true
   accumulate_grad_batches: 1
   gradient_clip_val: null
   gradient_clip_algorithm: null
@@ -42,8 +43,8 @@ trainer:
 model:
   predict_checkpoint_path: "./checkpoints/c_2/epoch=14-step=27885-v1.ckpt"
   satellite_resolution:
-  - 400
-  - 400
+    - 400
+    - 400
   drops_UAV:
     dropout: 0.1
     attn_drop: 0.1
@@ -65,29 +66,37 @@ model:
   lr_backbone: 0.01
   lr_fusion: 0.01
   milestones:
-  - 2
-  - 4
-  - 6
-  - 8
+    - 2
+    - 4
+    - 6
+    - 8
   gamma: 0.2
 data:
-  uav_dataset_dir: "/home/spagnologasper/Documents/uav-localization-experiments/drone_dataset"
-  satellite_dataset_dir: "/home/spagnologasper/Documents/uav-localization-experiments/satellite_dataset"
-  sat_zoom_level: 16
-  uav_patch_width: 256 
-  uav_patch_height: 256 
+  uav_dataset_dir: "/home/spagnologasper/Documents/datasets/drone_dataset"
+  satellite_dataset_dir: "/home/spagnologasper/Documents/datasets/satellite_dataset"
+  misslabeled_images_path: "./code/misslabels/misslabeled.txt"
+  sat_zoom_level: 17
+  uav_patch_width: 256
+  uav_patch_height: 256
+  sat_patch_height: 400
+  sat_patch_width: 400
+  uav_image_scale: 1.0
+  max_rotation_angle: 180
+  sat_available_years:
+    - "2016"
+    - "2019"
+    - "2021"
+    - "2023"
   heatmap_kernel_size: 33
   test_from_train_ratio: 0.1
-  uav_scales:
-  - 1.5
   transform_mean:
-  - 0.485
-  - 0.456
-  - 0.406
+    - 0.485
+    - 0.456
+    - 0.406
   transform_std:
-  - 0.229
-  - 0.224
-  - 0.225
+    - 0.229
+    - 0.224
+    - 0.225
   val_dataloader_batch_size: 4
   val_dataloader_num_workers: 16
   train_dataloader_batch_size: 4

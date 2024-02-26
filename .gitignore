@@ -8,3 +8,5 @@ satellite_dataset/**
 **/wandb/
 **/checkpoints/
 code/config.yaml
+.direnv/
+config.yaml

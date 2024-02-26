@@ -1,15 +1,16 @@
-seed_everything: 42 
+---
+seed_everything: 42
 trainer:
   accelerator: auto
   strategy: auto
   devices: auto
   num_nodes: 1
-  precision: 32 
+  precision: 32
   logger: null
   callbacks: null
   fast_dev_run: false
   max_epochs: 24
-  min_epochs: 2 
+  min_epochs: 2
   max_steps: -1
   min_steps: null
   max_time: null
@@ -23,13 +24,13 @@ trainer:
   num_sanity_val_steps: null
   log_every_n_steps: null
   enable_checkpointing: true
-  enable_progress_bar: true 
-  enable_model_summary: true 
+  enable_progress_bar: true
+  enable_model_summary: true
   accumulate_grad_batches: 2
   gradient_clip_val: null
   gradient_clip_algorithm: null
-  deterministic: false 
-  benchmark: true 
+  deterministic: false
+  benchmark: true
   inference_mode: true
   use_distributed_sampler: true
   profiler: null
@@ -41,8 +42,8 @@ trainer:
   default_root_dir: null
 model:
   satellite_resolution:
-  - 400
-  - 400
+    - 400
+    - 400
   drops_UAV:
     dropout: 0.1
     attn_drop: 0.1
@@ -74,7 +75,7 @@ data:
   satellite_dataset_dir: "/mnt/drive/tiles"
   sat_zoom_level: 17
   uav_patch_width: 320
-  uav_patch_height: 320 
+  uav_patch_height: 320
   sat_patch_width: 400
   sat_patch_height: 400
   heatmap_kernel_size: 81
@@ -95,13 +96,13 @@ data:
     - "2021"
     - "2023"
   transform_mean:
-  - 0.485
-  - 0.456
-  - 0.406
+    - 0.485
+    - 0.456
+    - 0.406
   transform_std:
-  - 0.229
-  - 0.224
-  - 0.225
+    - 0.229
+    - 0.224
+    - 0.225
   val_dataloader_batch_size: 8
   val_dataloader_num_workers: 24
   train_dataloader_batch_size: 8

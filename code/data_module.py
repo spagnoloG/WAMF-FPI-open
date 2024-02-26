@@ -20,13 +20,14 @@ class DataModule(pl.LightningDataModule):
         test_from_train_ratio: float,
         transform_mean: List[float],
         transform_std: List[float],
+        max_rotation_angle: int,
         sat_available_years: List[str],
-        rotation_angles: List[float],
         uav_image_scale: float,
         val_dataloader_batch_size: int,
         val_dataloader_num_workers: int,
         train_dataloader_batch_size: int,
         train_dataloader_num_workers: int,
+        misslabeled_images_path: str,
         *args,
         **kwargs
     ) -> None:
@@ -46,9 +47,10 @@ class DataModule(pl.LightningDataModule):
         self.val_dataloader_num_workers = val_dataloader_num_workers
         self.train_dataloader_batch_size = train_dataloader_batch_size
         self.train_dataloader_num_workers = train_dataloader_num_workers
+        self.max_rotation_angle = max_rotation_angle
         self.sat_available_years = sat_available_years
-        self.rotation_angles = rotation_angles
         self.uav_image_scale = uav_image_scale
+        self.misslabeled_images_path = misslabeled_images_path
 
     @classmethod
     def add_argparse_args(cls, parent_parser: ArgumentParser) -> ArgumentParser:
@@ -80,9 +82,7 @@ class DataModule(pl.LightningDataModule):
         parser.add_argument(
             "--sat_available_years", type=str, nargs="+", default=["2019"]
         )
-        parser.add_argument(
-            "--rotation_angles", type=float, nargs="+", default=[0, 90, 180, 270]
-        )
+        parser.add_argument("--max_rotation_angle", type=int, nargs="+", default=0)
 
         return parser
 
@@ -103,10 +103,11 @@ class DataModule(pl.LightningDataModule):
                 transform_std=self.transform_std,
                 dataset="train",
                 uav_image_scale=self.uav_image_scale,
-                rotation_angles=self.rotation_angles,
+                max_rotation_angle=self.max_rotation_angle,
                 sat_available_years=self.sat_available_years,
                 sat_patch_height=self.sat_patch_height,
                 sat_patch_width=self.sat_patch_width,
+                misslabeled_images_path=self.misslabeled_images_path,
             )
 
         self.val_dataset = GeoLocalizationDataset(
@@ -121,10 +122,11 @@ class DataModule(pl.LightningDataModule):
             transform_mean=self.transform_mean,
             transform_std=self.transform_std,
             dataset="test",
-            rotation_angles=self.rotation_angles,
+            max_rotation_angle=self.max_rotation_angle,
             sat_available_years=self.sat_available_years,
             sat_patch_height=self.sat_patch_height,
             sat_patch_width=self.sat_patch_width,
+            misslabeled_images_path=self.misslabeled_images_path,
         )
 
     def train_dataloader(self) -> DataLoader:

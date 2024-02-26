@@ -72,9 +72,10 @@
             configargparse
             jsonargparse
             docstring-parser
+            black
           ]);
       in {
-        devShells.default = pkgs.mkShell { buildInputs = [ pythonEnv ]; };
+        devShells.default = pkgs.mkShell { buildInputs = [ pythonEnv pkgs.yamlfmt ]; };
       });
 
 }

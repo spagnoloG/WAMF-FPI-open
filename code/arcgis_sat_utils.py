@@ -41,7 +41,7 @@ class SatUtils:
             yield dataset
         finally:
             del dataset
-
+            
     def get_tiff_map(self, tile: mercantile.Tile, sat_year: str) -> (np.ndarray, dict):
         """
         Returns a TIFF map of the given tile using GDAL.

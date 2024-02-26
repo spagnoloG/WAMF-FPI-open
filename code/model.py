@@ -301,12 +301,12 @@ class ModifiedPCPVT(nn.Module):
         self.model.blocks = original_model.blocks[:3]  # Only use the first 3 blocks
         self.model.norm = nn.Identity()  # Remove the normalization layer
         self.model.head = nn.Identity()  # Remove the head layer
-        self.model.patch_embeds[
-            3
-        ] = nn.Identity()  # Remove the last patch embedding layer
-        self.model.pos_block[
-            3
-        ] = nn.Identity()  # Remove the last position embedding layer
+        self.model.patch_embeds[3] = (
+            nn.Identity()
+        )  # Remove the last patch embedding layer
+        self.model.pos_block[3] = (
+            nn.Identity()
+        )  # Remove the last position embedding layer
 
         # Add the save_features layer to the first 3 blocks
         self.save_l0 = SaveLayerFeatures()
